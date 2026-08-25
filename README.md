@@ -9,6 +9,79 @@ pip install -r requirements.txt
 python app.py
 ```
 
+## Setup
+
+Texture Forge is a client. It does not ship a model — it drives a **ComfyUI**
+install you provide, so you need that working first.
+
+### 1. Requirements
+
+- **A CUDA GPU with 12 GB VRAM or more.** Developed on an RTX 5070 (12 GB).
+  1024×1024 fits comfortably; 1408 may run out of memory.
+- Blackwell cards (50-series) need a **cu128** torch build.
+- ~24 GB of disk for the model files.
+
+### 2. ComfyUI
+
+Install from [comfyanonymous/ComfyUI](https://github.com/comfyanonymous/ComfyUI)
+and confirm it starts on its own before going further. **Use its venv**, not your
+system Python — Texture Forge launches
+`ComfyUI/venv/Scripts/python.exe` (or `venv/bin/python`) automatically, because a
+system interpreter usually has neither torch nor sqlalchemy and dies on import.
+
+If ComfyUI lives somewhere other than `C:\Users\onegu\ComfyUI`, set the path:
+
+```bash
+set COMFYUI_DIR=D:\path\to\ComfyUI        # Windows
+export COMFYUI_DIR=/path/to/ComfyUI       # macOS / Linux
+```
+
+### 3. FLUX.1-dev model files
+
+Four files, each in a specific folder. Filenames must match exactly — they are
+referenced by name in `forge/comfy.py`.
+
+| File | Goes in |
+|---|---|
+| `flux1-dev-fp8.safetensors` | `ComfyUI/models/diffusion_models/` |
+| `clip_l.safetensors` | `ComfyUI/models/text_encoders/` |
+| `t5xxl_fp8_e4m3fn_scaled.safetensors` | `ComfyUI/models/text_encoders/` |
+| `ae.safetensors` | `ComfyUI/models/vae/` |
+
+The text encoders come from
+[comfyanonymous/flux_text_encoders](https://huggingface.co/comfyanonymous/flux_text_encoders).
+The fp8 checkpoint and VAE come from the
+[Comfy-Org FLUX.1-dev repackage](https://huggingface.co/Comfy-Org/flux1-dev).
+
+**Check the filenames on the repo pages before downloading.** Repackaged builds
+get renamed between releases, and a mismatch surfaces as ComfyUI rejecting the
+workflow rather than as a missing-file error. If that happens, open ComfyUI
+directly and read the exact names in the loader dropdowns — those are the
+strings to put in `forge/comfy.py`.
+
+Restart ComfyUI after adding the files.
+
+### 4. Licensing
+
+**FLUX.1-dev is released under a non-commercial licence.** Texture Forge itself
+is MIT and carries no model weights, but anything you generate is governed by
+[Black Forest Labs' terms](https://huggingface.co/black-forest-labs/FLUX.1-dev).
+Read them before putting output on a paid commission.
+
+Swapping in a permissively licensed model is a matter of editing the four
+constants at the top of `forge/comfy.py` and adjusting the workflow graph.
+
+### 5. Check it works
+
+Start Texture Forge, open `http://localhost:4796`, and press **Start engine**.
+The dot goes green and reports free VRAM once ComfyUI answers — roughly 40
+seconds. If it stays red, run ComfyUI by hand and read its console: nearly every
+failure at this stage is a missing model file or a torch build that doesn't
+match the card.
+
+The **Silhouettes** and **Squint check** tabs need none of this and work with no
+GPU at all.
+
 ## The problem it solves
 
 Ask an image model for "a purple lightning race car" and you get a *picture of a
