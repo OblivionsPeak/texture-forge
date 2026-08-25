@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Texture Forge</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<header class="bar">
+  <div class="brand">
+    <span class="mark"></span>
+    <div>
+      <h1>Texture Forge</h1>
+      <p>Flat livery textures — local FLUX, nothing leaves this machine</p>
+    </div>
+  </div>
+  <div class="engine">
+    <span id="engineDot" class="dot"></span>
+    <span id="engineText">checking…</span>
+    <button id="btnStart" class="ghost">Start engine</button>
+    <button id="btnStop"  class="ghost" title="ComfyUI holds VRAM that iRacing needs">Stop</button>
+  </div>
+</header>
+
+<nav class="tabs">
+  <button data-tab="texture" class="on">Textures</button>
+  <button data-tab="shape">Silhouettes</button>
+  <button data-tab="check">Squint check</button>
+</nav>
+
+<main>
+  <!-- ===================== TEXTURES ===================== -->
+  <section id="tab-texture" class="tab on">
+    <aside class="panel">
+      <h2>Preset</h2>
+      <div id="presets" class="presets"></div>
+
+      <h2>Colour</h2>
+      <input id="color" type="text" placeholder="electric violet">
+      <p class="tip">Plain words beat hex here — FLUX reads "electric violet", not #7B2FBE.</p>
+
+      <h2>Extra detail <span class="opt">optional</span></h2>
+      <input id="extra" type="text" placeholder="e.g. embers drifting upward">
+
+      <h2>Output</h2>
+      <label class="row"><span>Render size</span>
+        <select id="genSize">
+          <option value="1024">1024 — fast, safe on 12 GB</option>
+          <option value="1216">1216 — slower</option>
+          <option value="1408">1408 — may OOM</option>
+        </select>
+      </label>
+      <label class="row"><span>Steps</span><input id="steps" type="number" value="20" min="8" max="50"></label>
+      <label class="row"><span>Seed</span><input id="seed" type="number" placeholder="random"></label>
+
+      <h2>Finishing</h2>
+      <label class="chk"><input id="devig" type="checkbox" checked> Remove vignette</label>
+      <label class="chk"><input id="tile" type="checkbox"> Mirror-tile (seamless 2×2)</label>
+      <label class="row"><span>Contrast</span><input id="contrast" type="range" min="0.6" max="2" step="0.05" value="1.15"></label>
+      <label class="row"><span>Saturation</span><input id="sat" type="range" min="0" max="2" step="0.05" value="1.05"></label>
+
+      <button id="btnGen" class="primary big">Forge texture</button>
+      <p class="tip" id="genNote"></p>
+    </aside>
+
+    <div class="stage">
+      <div id="texResult" class="result empty">
+        <p>Pick a preset and forge. Output lands in <code>out/</code> at 2048×2048, ready to drop into Clearcoat as a Custom Image layer.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== SILHOUETTES ===================== -->
+  <section id="tab-shape" class="tab">
+    <aside class="panel">
+      <h2>Shape</h2>
+      <div id="shapes" class="presets"></div>
+      <p class="tip">These are drawn mathematically, not generated. Crisp at any size, seamless left-to-right so they wrap the car, and pure alpha so you recolour them in Clearcoat.</p>
+
+      <h2>Controls</h2>
+      <label class="row"><span>Width</span><input id="sWidth" type="number" value="2048" step="256"></label>
+      <label class="row"><span>Height</span><input id="sHeight" type="number" value="640" step="64"></label>
+      <label class="row"><span>Seed</span><input id="sSeed" type="number" placeholder="random"></label>
+      <div id="shapeOpts"></div>
+
+      <button id="btnShape" class="primary big">Draw shape</button>
+    </aside>
+
+    <div class="stage">
+      <div id="shapeResult" class="result empty checker">
+        <p>Mountain ridgelines, pine treelines, skylines and speed stripes — the layers diffusion always softens.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== SQUINT CHECK ===================== -->
+  <section id="tab-check" class="tab">
+    <aside class="panel">
+      <h2>Distance test</h2>
+      <p class="tip">Drop in any livery render, texture or screenshot. Hue disappears with distance before brightness does, so a design whose patches all share one brightness reads as a single flat mass on a moving car — however good it looks up close.</p>
+      <input id="checkFile" type="file" accept="image/*">
+      <label class="row" style="margin-top:10px"><span>Image is</span>
+        <select id="checkMode">
+          <option value="render">a car render / photo</option>
+          <option value="texture">a flat texture</option>
+        </select>
+      </label>
+      <p class="tip">On a car render the paint is isolated first. Without that, the backdrop, tyres and white sidewall lettering span the whole luminance range and every livery scores well — including ones that provably vanish at distance.</p>
+      <button id="btnCheck" class="primary big">Run check</button>
+    </aside>
+    <div class="stage">
+      <div id="checkResult" class="result empty"><p>No image loaded.</p></div>
+    </div>
+  </section>
+</main>
+
+<div id="toast" class="toast"></div>
+<script src="/static/app.js"></script>
+</body>
+</html>
