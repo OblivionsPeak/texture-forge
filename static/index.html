@@ -34,15 +34,32 @@
   <!-- ===================== TEXTURES ===================== -->
   <section id="tab-texture" class="tab on">
     <aside class="panel">
-      <h2>Preset</h2>
-      <div id="presets" class="presets"></div>
+      <div class="modes" id="texMode">
+        <button data-m="describe" class="on">Describe it</button>
+        <button data-m="preset">Presets</button>
+      </div>
+
+      <div id="describeBox">
+        <h2>What's it inspired by?</h2>
+        <input id="subject" type="text" placeholder="a dragon" autocomplete="off">
+        <p class="tip">Name the thing, not the picture. "A dragon" becomes dragon
+          <i>scales</i> — ask for a dragon directly and you get a dragon standing in a field.</p>
+
+        <h2>Treatment</h2>
+        <div id="treatments" class="presets"></div>
+      </div>
+
+      <div id="presetBox" class="hidden">
+        <h2>Preset</h2>
+        <div id="presets" class="presets"></div>
+      </div>
 
       <h2>Colour</h2>
       <input id="color" type="text" placeholder="electric violet">
       <p class="tip">Plain words beat hex here — FLUX reads "electric violet", not #7B2FBE.</p>
 
-      <h2>Extra detail <span class="opt">optional</span></h2>
-      <input id="extra" type="text" placeholder="e.g. embers drifting upward">
+      <h2 class="presetOnly">Extra detail <span class="opt">optional</span></h2>
+      <input id="extra" type="text" class="presetOnly" placeholder="e.g. embers drifting upward">
 
       <h2>Output</h2>
       <label class="row"><span>Render size</span>
@@ -67,7 +84,7 @@
 
     <div class="stage">
       <div id="texResult" class="result empty">
-        <p>Pick a preset and forge. Output lands in <code>out/</code> at 2048×2048, ready to drop into Clearcoat as a Custom Image layer.</p>
+        <p>Describe what it is inspired by, choose a treatment, and forge. Output lands in <code>out/</code> at 2048×2048, ready to drop into Clearcoat as a Custom Image layer.</p>
       </div>
     </div>
   </section>

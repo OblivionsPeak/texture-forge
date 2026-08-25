@@ -129,6 +129,122 @@ PRESETS = [
 BY_ID = {p["id"]: p for p in PRESETS}
 
 
+# ---------------------------------------------------------------- free-form
+
+# Ask FLUX for "a dragon" and it paints a dragon: one creature, in perspective,
+# on a landscape, with a horizon and a vignette. Useless on a car. What you
+# actually want from "dragon" is its SURFACE - overlapping scales - or its
+# ENERGY, or the marks it leaves. These treatments do that translation.
+TREATMENTS = {
+    "surface": {
+        "name": "Surface",
+        "hint": "The thing's skin, tiled edge to edge. Scales, hide, bark, plating.",
+        "template": "extreme close-up of tightly packed {motif} filling the entire "
+                    "frame, {color} tones, deep shadow between each one, sharp "
+                    "raking light picking out every edge",
+    },
+    "energy": {
+        "name": "Energy",
+        "hint": "What it emits. Fire, lightning, plasma, glow.",
+        "template": "violent {energy} erupting across the whole frame, brilliant "
+                    "glowing {color} cores against near-black, intense contrast, "
+                    "streaming filaments and sparks",
+    },
+    "marks": {
+        "name": "Marks",
+        "hint": "What it leaves behind. Claw rakes, gouges, scorches, cracks.",
+        "template": "deep {marks} torn across a dark surface, ragged edges, "
+                    "glowing {color} light bleeding from inside each tear, "
+                    "hard shadow, high contrast",
+    },
+    "form": {
+        "name": "Silhouette",
+        "hint": "Its shape as flat pattern. Bold graphic, reads at distance.",
+        "template": "bold flat silhouettes of {subject} repeated as a decorative "
+                    "pattern, solid {color} shapes on near-black, stencil-like, "
+                    "no shading, strong negative space",
+    },
+    "atmosphere": {
+        "name": "Atmosphere",
+        "hint": "The air around it. Smoke, mist, aura, embers.",
+        "template": "dense swirling {atmos} evoking {subject}, luminous {color} "
+                    "billows against deep black, drifting embers, soft depth "
+                    "with bright cores",
+    },
+}
+
+# Keyword -> motif. Encodes the bit a designer does automatically: knowing that
+# "dragon" means scales, "wolf" means fur, and "engine" means machined plate.
+MOTIF_TABLE = [
+    (("dragon", "serpent", "snake", "lizard", "reptile", "wyvern", "basilisk",
+      "fish", "koi", "shark", "naga"), "overlapping reptilian scales", "roaring fire and embers",
+     "raking claw slashes", "curling smoke"),
+    (("wolf", "bear", "lion", "tiger", "fox", "boar", "panther", "cat", "hound"),
+     "dense animal fur", "snarling heat haze", "raking claw slashes", "cold breath vapour"),
+    (("phoenix", "eagle", "hawk", "raven", "crow", "owl", "bird", "falcon"),
+     "layered feathers", "blazing plumage fire", "talon rakes", "drifting ash and embers"),
+    (("insect", "beetle", "wasp", "hornet", "spider", "mantis", "scarab"),
+     "iridescent chitin plating", "crackling static", "chitin fracture lines", "fine web filaments"),
+    (("skull", "bone", "skeleton", "reaper", "death"),
+     "cracked bone surface", "spectral flame", "deep gouges", "graveyard mist"),
+    (("volcano", "lava", "magma", "ember", "inferno", "fire", "flame"),
+     "cracked volcanic crust", "molten eruption", "scorch fractures", "smoke and cinders"),
+    (("ice", "frost", "glacier", "winter", "arctic", "blizzard"),
+     "fractured ice planes", "freezing crystal bloom", "shatter cracks", "frozen fog"),
+    (("storm", "thunder", "lightning", "tempest", "hurricane"),
+     "churning storm cloud", "forked lightning", "wind-torn gouges", "driving rain haze"),
+    (("ocean", "wave", "water", "tide", "sea", "storm surge"),
+     "breaking wave crests", "bioluminescent surge", "spray-carved channels", "sea mist"),
+    (("machine", "engine", "robot", "mech", "industrial", "gear", "turbine", "piston"),
+     "machined metal plating with rivets", "arcing electrical discharge",
+     "gouged metal scoring", "exhaust haze"),
+    (("circuit", "cyber", "digital", "data", "neon", "tech", "matrix"),
+     "dense circuit traces", "streaming data light", "glitch fractures", "neon haze"),
+    (("forest", "tree", "wood", "jungle", "leaf", "vine"),
+     "gnarled bark and grain", "sunlight shafts", "splintered wood gouges", "forest mist"),
+    (("stone", "rock", "granite", "marble", "mountain", "canyon"),
+     "riven stone strata", "glowing mineral veins", "chisel fractures", "dust haze"),
+    (("galaxy", "nebula", "cosmic", "space", "star", "void", "celestial"),
+     "star-flecked cosmic dust", "stellar flare", "rifts torn in space", "nebula clouds"),
+    (("snake", "camo", "military", "tactical", "armour", "armor", "knight"),
+     "riveted armour plating", "forge sparks", "battle scoring", "smoke of battle"),
+]
+
+DEFAULT_MOTIF = ("richly detailed surface texture", "surging energy",
+                 "deep torn gouges", "swirling haze")
+
+
+def motifs_for(subject):
+    s = (subject or "").lower()
+    for keys, surface, energy, marks, atmos in MOTIF_TABLE:
+        if any(k in s for k in keys):
+            return surface, energy, marks, atmos
+    return DEFAULT_MOTIF
+
+
+def compile_freeform(subject, treatment="surface", color=None):
+    """Turn a plain-language idea into a livery-grade texture prompt.
+
+    Rule-based on purpose. An LLM would expand these more fluently, but it
+    would need a key, cost money per generation and put the one offline tool in
+    the stack behind someone's API - all to do a job a lookup table does well.
+    """
+    subject = (subject or "").strip()
+    if not subject:
+        raise ValueError("describe what you want first")
+    t = TREATMENTS.get(treatment) or TREATMENTS["surface"]
+    surface, energy, marks, atmos = motifs_for(subject)
+
+    body = t["template"].format(
+        subject=subject, motif=surface, energy=energy, marks=marks, atmos=atmos,
+        color=(color or "").strip() or "richly saturated",
+    )
+    # The subject is named once for flavour, but the treatment carries the
+    # composition - leading with the bare noun is what summons a portrait.
+    text = f"{body}, inspired by {subject}, {FLAT}"
+    return text, NEGATIVE
+
+
 def build(preset_id, color=None, extra=None):
     """Return (positive, negative) for a preset with an optional colour override."""
     p = BY_ID.get(preset_id)

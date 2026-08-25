@@ -1,7 +1,9 @@
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
 
-let STATE = { presets: [], shapes: [], preset: 'storm', shape: 'mountains', busy: false };
+let STATE = { presets: [], shapes: [], treatments: [],
+              preset: 'storm', shape: 'mountains', treatment: 'surface',
+              texMode: 'describe', busy: false };
 
 /* ------------------------------------------------------------ helpers */
 
@@ -25,6 +27,11 @@ async function api(path, body, isForm) {
   return j;
 }
 
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, (c) =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
 function busy(on, el, label) {
   STATE.busy = on;
   $$('button.primary').forEach((b) => { b.disabled = on; });
@@ -38,6 +45,7 @@ async function refreshStatus() {
     const s = await (await fetch('/api/status')).json();
     STATE.presets = s.presets;
     STATE.shapes = s.shapes;
+    STATE.treatments = s.treatments || [];
     const dot = $('#engineDot');
     dot.className = 'dot ' + (s.comfy_up ? 'up' : 'down');
     $('#engineText').textContent = s.comfy_up
@@ -45,7 +53,7 @@ async function refreshStatus() {
       : 'engine stopped';
     $('#btnStart').disabled = s.comfy_up;
     $('#btnStop').disabled = !s.comfy_up;
-    if (!$('#presets').children.length) { renderPresets(); renderShapes(); }
+    if (!$('#presets').children.length) { renderPresets(); renderShapes(); renderTreatments(); }
   } catch (e) {
     $('#engineText').textContent = 'server unreachable';
   }
@@ -120,14 +128,21 @@ function resultBlock(r, title) {
 
 $('#btnGen').onclick = async () => {
   if (STATE.busy) return;
+  if (STATE.texMode === 'describe' && !$('#subject').value.trim()) {
+    toast('Describe what it is inspired by first.', true); return;
+  }
   const el = $('#texResult');
   el.classList.remove('empty');
   busy(true, el, 'Forging… first run also loads the model, so allow a minute.');
   try {
+    const describing = STATE.texMode === 'describe';
     const r = await api('/api/generate', {
+      freeform: describing,
+      subject: describing ? $('#subject').value : null,
+      treatment: STATE.treatment,
       preset: STATE.preset,
       color: $('#color').value || null,
-      extra: $('#extra').value || null,
+      extra: describing ? null : ($('#extra').value || null),
       width: +$('#genSize').value, height: +$('#genSize').value,
       steps: +$('#steps').value,
       seed: $('#seed').value ? +$('#seed').value : null,
@@ -136,7 +151,8 @@ $('#btnGen').onclick = async () => {
       contrast: +$('#contrast').value,
       saturation: +$('#sat').value,
     });
-    el.innerHTML = resultBlock(r, 'Texture');
+    el.innerHTML = resultBlock(r, 'Texture')
+      + (r.prompt ? `<div class="prompt-peek"><b>Prompt sent:</b> ${esc(r.prompt)}</div>` : '');
     toast(r.value_range.ok
       ? 'Forged. This one will read at distance.'
       : 'Forged — but the value range is low, so it may go flat on track. Try raising contrast.');
@@ -146,6 +162,24 @@ $('#btnGen').onclick = async () => {
   }
   busy(false);
 };
+
+function renderTreatments() {
+  $('#treatments').innerHTML = STATE.treatments.map((t) =>
+    `<button data-id="${t.id}" title="${t.hint}" class="${t.id === STATE.treatment ? 'on' : ''}">
+       <b>${t.name}</b><i>${t.hint.split('.')[0]}</i></button>`).join('');
+  $$('#treatments button').forEach((b) => {
+    b.onclick = () => {
+      STATE.treatment = b.dataset.id;
+      $$('#treatments button').forEach((x) => x.classList.toggle('on', x === b));
+      const t = STATE.treatments.find((x) => x.id === STATE.treatment);
+      if (t) $('#genNote').textContent = t.hint;
+    };
+  });
+}
+
+$$('#texMode button').forEach((b) => {
+  b.onclick = () => { STATE.texMode = b.dataset.m; applyTexMode(); };
+});
 
 /* -------------------------------------------------------- silhouettes */
 
@@ -236,5 +270,14 @@ $('#btnCheck').onclick = async () => {
   busy(false);
 };
 
+function applyTexMode() {
+  const describing = STATE.texMode === 'describe';
+  $$('#texMode button').forEach((x) => x.classList.toggle('on', (x.dataset.m === 'describe') === describing));
+  $('#describeBox').classList.toggle('hidden', !describing);
+  $('#presetBox').classList.toggle('hidden', describing);
+  $$('.presetOnly').forEach((e) => e.classList.toggle('hidden', describing));
+}
+
+applyTexMode();
 refreshStatus();
 setInterval(refreshStatus, 15000);

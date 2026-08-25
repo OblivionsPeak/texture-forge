@@ -120,3 +120,16 @@ input[type=range]::-webkit-slider-thumb{
 }
 .toast.show{opacity:1; transform:translate(-50%,0)}
 .toast.err{border-left-color:var(--bad)}
+
+/* free-form mode toggle */
+.hidden{display:none !important}
+.modes{display:flex; gap:3px; background:var(--panel2); border:1px solid var(--line);
+  border-radius:9px; padding:3px; margin-bottom:16px}
+.modes button{flex:1; border:none; background:none; color:var(--dim); padding:7px 6px;
+  font-size:12.5px; border-radius:7px}
+.modes button.on{background:var(--accent); color:#fff; font-weight:600}
+.modes button:hover:not(.on){background:#232733; color:var(--ink)}
+#describeBox .tip i{color:var(--accent2); font-style:normal}
+.prompt-peek{font-size:11px; color:var(--mute); line-height:1.5; margin-top:10px;
+  background:var(--panel2); border:1px solid var(--line); border-radius:8px; padding:8px 10px;
+  max-height:96px; overflow:auto}

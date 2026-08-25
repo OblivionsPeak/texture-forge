@@ -37,6 +37,8 @@ def status():
         "comfy_up": up,
         "vram": comfy.vram() if up else None,
         "presets": [{k: p[k] for k in ("id", "name", "hint", "color")} for p in prompts.PRESETS],
+        "treatments": [{"id": k, "name": v["name"], "hint": v["hint"]}
+                       for k, v in prompts.TREATMENTS.items()],
         "shapes": [{"id": k, "name": v["name"], "hint": v["hint"], "seamless": v["seamless"]}
                    for k, v in silhouette.SHAPES.items()],
     })
@@ -83,9 +85,14 @@ def generate():
     if not comfy.is_up():
         return jsonify({"ok": False, "error": "ComfyUI is not running. Start it first."}), 409
     try:
-        pos, neg = prompts.build(preset, body.get("color"), body.get("extra"))
-    except KeyError:
-        return jsonify({"ok": False, "error": f"unknown preset {preset}"}), 400
+        if body.get("freeform"):
+            pos, neg = prompts.compile_freeform(
+                body.get("subject"), body.get("treatment", "surface"), body.get("color"))
+            preset = "freeform"
+        else:
+            pos, neg = prompts.build(preset, body.get("color"), body.get("extra"))
+    except (KeyError, ValueError) as e:
+        return jsonify({"ok": False, "error": str(e) or f"unknown preset {preset}"}), 400
 
     seed = int(body.get("seed") or random.randint(1, 2**31 - 1))
     w = int(body.get("width", 1024))
