@@ -85,6 +85,7 @@ $$('.tabs button').forEach((b) => {
     $$('.tab').forEach((x) => x.classList.remove('on'));
     b.classList.add('on');
     $('#tab-' + b.dataset.tab).classList.add('on');
+    if (b.dataset.tab === 'setup') refreshSetup(true);
   };
 });
 
@@ -268,6 +269,86 @@ $('#btnCheck').onclick = async () => {
     toast(e.message, true);
   }
   busy(false);
+};
+
+/* ---------------------------------------------------------------- setup */
+
+function gb(n) { return (n / 2 ** 30).toFixed(1) + ' GB'; }
+
+function row(state, title, detail) {
+  const ic = { ok: '✓', no: '✕', warn: '!' }[state];
+  return `<div class="check-row ${state}"><span class="ic">${ic}</span>
+    <div><b>${title}</b><span>${detail}</span></div></div>`;
+}
+
+let setupTimer = null;
+
+async function refreshSetup(showSpinner) {
+  const el = $('#setupResult');
+  if (showSpinner) el.innerHTML = '<div class="spin"></div>';
+  let s;
+  try { s = await (await fetch('/api/setup')).json(); }
+  catch (e) { el.innerHTML = `<p style="color:var(--bad)">${esc(e.message)}</p>`; return; }
+
+  const rows = [];
+  rows.push(s.comfy_found
+    ? row('ok', 'ComfyUI found', `<code>${esc(s.comfy_dir)}</code>`)
+    : row('no', 'ComfyUI not found',
+        `Looked in the usual places without luck. Install ComfyUI, then press Re-check. ` +
+        `If it lives somewhere unusual, set a <code>COMFYUI_DIR</code> environment variable pointing at it.`));
+
+  if (s.comfy_found) {
+    rows.push(s.comfy_venv
+      ? row('ok', 'ComfyUI has its own Python', 'Its venv will be used to launch it.')
+      : row('warn', 'No venv found inside ComfyUI',
+          'It will be launched with the system Python, which usually lacks torch. ' +
+          'Running ComfyUI once on its own normally creates the venv.'));
+
+    rows.push(s.model_ready
+      ? row('ok', `FLUX model ready (${esc(s.layout)} layout)`,
+          s.layout === 'checkpoint'
+            ? 'Single all-in-one checkpoint.'
+            : 'Separate UNet, text encoders and VAE.')
+      : row('no', 'FLUX model missing',
+          'About 16 GB, downloaded and verified for you. Press <b>Download model</b>.'));
+
+    rows.push(row(s.free_disk_gb > 20 ? 'ok' : 'warn', `${s.free_disk_gb} GB free on that drive`,
+      s.free_disk_gb > 20 ? 'Enough room for the model.' : 'The model needs roughly 16 GB plus headroom.'));
+
+    rows.push(s.running
+      ? row('ok', 'Engine running', 'Ready to forge. Stop it before racing to free VRAM.')
+      : row('warn', 'Engine stopped', 'Press <b>Start engine</b> in the header when you want to generate.'));
+  }
+
+  const p = s.progress || {};
+  let prog = '';
+  if (p.active || p.error || (p.finished && p.percent === 100)) {
+    const pct = p.percent || 0;
+    prog = `<div class="bar-out"><div class="bar-in" style="width:${pct}%"></div></div>
+      <p class="meta">${esc(p.file || '')} ${p.total ? `${gb(p.done)} / ${gb(p.total)}` : ''}
+      ${p.speed ? `· ${gb(p.speed)}/s` : ''} ${p.message ? `· ${esc(p.message)}` : ''}</p>`;
+    if (p.error) prog += `<div class="verdict bad"><b>Download failed</b> — ${esc(p.error)}</div>`;
+  }
+
+  el.classList.remove('empty');
+  el.innerHTML = `<div class="checks">${rows.join('')}</div>${prog}`;
+  $('#btnInstall').disabled = !s.comfy_found || s.model_ready || p.active;
+  $('#setupNote').textContent = s.model_ready
+    ? 'Everything is in place.'
+    : (p.active ? 'Downloading — you can leave this tab open.' : '');
+
+  clearTimeout(setupTimer);
+  if (p.active) setupTimer = setTimeout(() => refreshSetup(false), 1000);
+}
+
+$('#btnRecheck').onclick = () => refreshSetup(true);
+$('#btnInstall').onclick = async () => {
+  $('#btnInstall').disabled = true;
+  try {
+    const r = await api('/api/setup/install', { kind: 'checkpoint' });
+    toast(r.message);
+  } catch (e) { toast(e.message, true); }
+  refreshSetup(false);
 };
 
 function applyTexMode() {

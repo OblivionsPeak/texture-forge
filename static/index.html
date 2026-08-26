@@ -28,6 +28,7 @@
   <button data-tab="texture" class="on">Textures</button>
   <button data-tab="shape">Silhouettes</button>
   <button data-tab="check">Squint check</button>
+  <button data-tab="setup">Setup</button>
 </nav>
 
 <main>
@@ -129,6 +130,21 @@
     </aside>
     <div class="stage">
       <div id="checkResult" class="result empty"><p>No image loaded.</p></div>
+    </div>
+  </section>
+
+  <!-- ===================== SETUP ===================== -->
+  <section id="tab-setup" class="tab">
+    <aside class="panel">
+      <h2>First-run setup</h2>
+      <p class="tip">Texture Forge drives ComfyUI. This checks everything is in place
+        and fetches the model for you — no terminal, no Hugging Face account.</p>
+      <button id="btnRecheck" class="ghost" style="width:100%;margin-top:12px">Re-check</button>
+      <button id="btnInstall" class="primary big">Download model</button>
+      <p class="tip" id="setupNote"></p>
+    </aside>
+    <div class="stage">
+      <div id="setupResult" class="result"><div class="spin"></div></div>
     </div>
   </section>
 </main>

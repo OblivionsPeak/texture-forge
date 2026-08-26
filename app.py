@@ -11,7 +11,7 @@ from pathlib import Path
 from flask import Flask, jsonify, request, send_file, send_from_directory
 from PIL import Image
 
-from forge import comfy, post, prompts, silhouette
+from forge import comfy, post, prompts, setup as fsetup, silhouette
 
 ROOT = Path(__file__).parent
 OUT = ROOT / "out"
@@ -42,6 +42,18 @@ def status():
         "shapes": [{"id": k, "name": v["name"], "hint": v["hint"], "seamless": v["seamless"]}
                    for k, v in silhouette.SHAPES.items()],
     })
+
+
+@app.route("/api/setup")
+def setup_status():
+    return jsonify(fsetup.status())
+
+
+@app.route("/api/setup/install", methods=["POST"])
+def setup_install():
+    kind = (request.get_json(silent=True) or {}).get("kind", "checkpoint")
+    ok, msg = fsetup.install_model(kind)
+    return jsonify({"ok": ok, "message": msg}), (200 if ok else 409)
 
 
 @app.route("/api/comfy/<action>", methods=["POST"])

@@ -14,7 +14,6 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-COMFY_DIR = Path(os.environ.get("COMFYUI_DIR", r"C:\Users\onegu\ComfyUI"))
 HOST = "127.0.0.1"
 PORT = 8188
 BASE = f"http://{HOST}:{PORT}"
@@ -23,6 +22,35 @@ UNET = "flux1-dev-fp8.safetensors"
 CLIP_L = "clip_l.safetensors"
 T5 = "t5xxl_fp8_e4m3fn_scaled.safetensors"
 VAE = "ae.safetensors"
+CHECKPOINT = "flux1-dev-fp8.safetensors"      # all-in-one variant
+
+
+def find_comfy():
+    """Locate ComfyUI without anyone editing a config file.
+
+    COMFYUI_DIR wins if set; otherwise the usual install spots are searched.
+    Hard-coding one machine's path is what makes a tool feel like it was built
+    for somebody else.
+    """
+    env = os.environ.get("COMFYUI_DIR")
+    if env:
+        return Path(env)
+    home = Path.home()
+    roots = [home, home / "Documents", home / "Desktop", home / "AppData" / "Local",
+             Path("C:/"), Path("D:/"), Path("/opt"), Path("/usr/local")]
+    names = ["ComfyUI", "comfyui", "ComfyUI_windows_portable/ComfyUI", "StabilityMatrix/Packages/ComfyUI"]
+    for r in roots:
+        for n in names:
+            p = r / n
+            try:
+                if (p / "main.py").exists():
+                    return p
+            except OSError:
+                continue
+    return home / "ComfyUI"          # sensible default for the error message
+
+
+COMFY_DIR = find_comfy()
 
 
 def _get(path, timeout=5):
@@ -116,33 +144,69 @@ def stop():
     return True, "stopped"
 
 
-def build_workflow(prompt, negative, width, height, seed, steps=20, guidance=3.5):
+def layout():
+    """Which FLUX install is present: 'split', 'checkpoint', or None.
+
+    Comfy-Org publish an all-in-one fp8 checkpoint that bundles UNet, both text
+    encoders and the VAE in a single file. That is one download into one folder
+    rather than four files across three, so it is what new installs get - but
+    plenty of existing setups are split, so both are supported.
+    """
+    m = COMFY_DIR / "models"
+    split = all([
+        (m / "diffusion_models" / UNET).exists(),
+        (m / "text_encoders" / CLIP_L).exists(),
+        (m / "text_encoders" / T5).exists(),
+        (m / "vae" / VAE).exists(),
+    ])
+    if split:
+        return "split"
+    if (m / "checkpoints" / CHECKPOINT).exists():
+        return "checkpoint"
+    return None
+
+
+def build_workflow(prompt, negative, width, height, seed, steps=20, guidance=3.5,
+                   mode=None):
     """Minimal FLUX.1-dev graph in API format.
 
     FLUX runs through a plain KSampler at cfg=1.0 with guidance supplied by the
     FluxGuidance node instead — pushing cfg above 1 burns the image out.
     """
+    mode = mode or layout() or "split"
+    if mode == "checkpoint":
+        loaders = {
+            "1": {"class_type": "CheckpointLoaderSimple",
+                  "inputs": {"ckpt_name": CHECKPOINT}},
+        }
+        model_ref, clip_ref, vae_ref = ["1", 0], ["1", 1], ["1", 2]
+    else:
+        loaders = {
+            "1": {"class_type": "UNETLoader",
+                  "inputs": {"unet_name": UNET, "weight_dtype": "fp8_e4m3fn"}},
+            "2": {"class_type": "DualCLIPLoader",
+                  "inputs": {"clip_name1": CLIP_L, "clip_name2": T5, "type": "flux"}},
+            "3": {"class_type": "VAELoader", "inputs": {"vae_name": VAE}},
+        }
+        model_ref, clip_ref, vae_ref = ["1", 0], ["2", 0], ["3", 0]
+
     return {
-        "1": {"class_type": "UNETLoader",
-              "inputs": {"unet_name": UNET, "weight_dtype": "fp8_e4m3fn"}},
-        "2": {"class_type": "DualCLIPLoader",
-              "inputs": {"clip_name1": CLIP_L, "clip_name2": T5, "type": "flux"}},
-        "3": {"class_type": "VAELoader", "inputs": {"vae_name": VAE}},
+        **loaders,
         "4": {"class_type": "CLIPTextEncode",
-              "inputs": {"text": prompt, "clip": ["2", 0]}},
+              "inputs": {"text": prompt, "clip": clip_ref}},
         "5": {"class_type": "CLIPTextEncode",
-              "inputs": {"text": negative or "", "clip": ["2", 0]}},
+              "inputs": {"text": negative or "", "clip": clip_ref}},
         "6": {"class_type": "FluxGuidance",
               "inputs": {"conditioning": ["4", 0], "guidance": guidance}},
         "7": {"class_type": "EmptySD3LatentImage",
               "inputs": {"width": width, "height": height, "batch_size": 1}},
         "8": {"class_type": "KSampler",
-              "inputs": {"model": ["1", 0], "positive": ["6", 0], "negative": ["5", 0],
+              "inputs": {"model": model_ref, "positive": ["6", 0], "negative": ["5", 0],
                          "latent_image": ["7", 0], "seed": seed, "steps": steps,
                          "cfg": 1.0, "sampler_name": "euler", "scheduler": "simple",
                          "denoise": 1.0}},
         "9": {"class_type": "VAEDecode",
-              "inputs": {"samples": ["8", 0], "vae": ["3", 0]}},
+              "inputs": {"samples": ["8", 0], "vae": vae_ref}},
         "10": {"class_type": "SaveImage",
                "inputs": {"images": ["9", 0], "filename_prefix": "texforge"}},
     }

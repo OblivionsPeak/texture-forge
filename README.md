@@ -4,6 +4,14 @@ Flat livery textures from local FLUX, plus the silhouette layers diffusion does
 badly. Browser UI on `http://localhost:4796`. Nothing leaves the machine, no API
 keys, no cost per image.
 
+**Windows:** double-click **`Start Texture Forge.bat`**.
+**macOS / Linux:** run `./start-texture-forge.sh`.
+
+Either one creates a private Python environment, installs what it needs, starts
+the app and opens it in your browser. No terminal required after that.
+
+If you would rather do it by hand:
+
 ```bash
 pip install -r requirements.txt
 python app.py
@@ -24,42 +32,44 @@ install you provide, so you need that working first.
 ### 2. ComfyUI
 
 Install from [comfyanonymous/ComfyUI](https://github.com/comfyanonymous/ComfyUI)
-and confirm it starts on its own before going further. **Use its venv**, not your
-system Python — Texture Forge launches
-`ComfyUI/venv/Scripts/python.exe` (or `venv/bin/python`) automatically, because a
-system interpreter usually has neither torch nor sqlalchemy and dies on import.
+and run it once on its own before going further — that first run creates the
+venv holding torch, which Texture Forge then launches it with. A system Python
+usually has neither torch nor sqlalchemy and dies on import.
 
-If ComfyUI lives somewhere other than `C:\Users\onegu\ComfyUI`, set the path:
+**You do not need to configure a path.** Texture Forge searches the usual
+install locations. If yours is somewhere unusual, set `COMFYUI_DIR` to point at
+it and that wins:
 
 ```bash
 set COMFYUI_DIR=D:\path\to\ComfyUI        # Windows
 export COMFYUI_DIR=/path/to/ComfyUI       # macOS / Linux
 ```
 
-### 3. FLUX.1-dev model files
+### 3. The FLUX model
 
-Four files, each in a specific folder. Filenames must match exactly — they are
-referenced by name in `forge/comfy.py`.
+**Open the Setup tab and press "Download model".** It fetches the ~16 GB
+all-in-one FLUX.1-dev checkpoint into the right folder, shows progress, and
+verifies the result before accepting it. Nothing else to do.
 
-| File | Goes in |
+That checkpoint bundles the UNet, both text encoders and the VAE in one file
+(1442 tensors), which is why setup is one download rather than four. It is also
+**not gated** — Black Forest Labs' own repo returns 401 without an account and
+an accepted licence, which is exactly the wall a non-technical user stops at.
+
+Texture Forge supports both layouts and detects which you have:
+
+| Layout | Files |
 |---|---|
-| `flux1-dev-fp8.safetensors` | `ComfyUI/models/diffusion_models/` |
-| `clip_l.safetensors` | `ComfyUI/models/text_encoders/` |
-| `t5xxl_fp8_e4m3fn_scaled.safetensors` | `ComfyUI/models/text_encoders/` |
-| `ae.safetensors` | `ComfyUI/models/vae/` |
+| **Checkpoint** (what Setup installs) | `flux1-dev-fp8.safetensors` in `models/checkpoints/` |
+| **Split** (many existing installs) | UNet in `models/diffusion_models/`, `clip_l` + `t5xxl_fp8_e4m3fn_scaled` in `models/text_encoders/`, `ae.safetensors` in `models/vae/` |
 
-The text encoders come from
-[comfyanonymous/flux_text_encoders](https://huggingface.co/comfyanonymous/flux_text_encoders).
-The fp8 checkpoint and VAE come from the
-[Comfy-Org FLUX.1-dev repackage](https://huggingface.co/Comfy-Org/flux1-dev).
+Downloads are checked two ways: a pinned SHA256 where the file was verified
+byte-for-byte against a known-good install, and a structural check that the
+safetensors header parses and holds the expected tensor count. A truncated file,
+or an HTML error page saved under a `.safetensors` name, is caught here rather
+than surfacing later as something cryptic from ComfyUI.
 
-**Check the filenames on the repo pages before downloading.** Repackaged builds
-get renamed between releases, and a mismatch surfaces as ComfyUI rejecting the
-workflow rather than as a missing-file error. If that happens, open ComfyUI
-directly and read the exact names in the loader dropdowns — those are the
-strings to put in `forge/comfy.py`.
-
-Restart ComfyUI after adding the files.
+Restart ComfyUI after the download.
 
 ### 4. Licensing
 
@@ -73,11 +83,11 @@ constants at the top of `forge/comfy.py` and adjusting the workflow graph.
 
 ### 5. Check it works
 
-Start Texture Forge, open `http://localhost:4796`, and press **Start engine**.
-The dot goes green and reports free VRAM once ComfyUI answers — roughly 40
-seconds. If it stays red, run ComfyUI by hand and read its console: nearly every
-failure at this stage is a missing model file or a torch build that doesn't
-match the card.
+The **Setup** tab shows a checklist: ComfyUI found, its venv, the model, free
+disk, engine state. Anything red tells you what to do about it.
+
+Then press **Start engine** in the header. The dot goes green and reports free
+VRAM once ComfyUI answers — roughly 40 seconds.
 
 The **Silhouettes** and **Squint check** tabs need none of this and work with no
 GPU at all.
@@ -95,14 +105,26 @@ Every preset here is written for **flat 2D artwork, orthographic, evenly lit,
 no depth of field, no vignette, no text**. That single change is the difference
 between a nice picture and a usable texture.
 
-## Three tabs
+## Four tabs
 
-**Textures** — 12 FLUX presets (storm lightning, nebula swirl, fractured glass,
-cracked lava, liquid metal, ink in water, circuit grid, high-contrast camo,
-marble, aurora, carbon weave, topographic). Colour is a plain-language field
-because FLUX reads "electric violet", not `#7B2FBE`. Output is 2048×2048, ready
-to drop into Clearcoat as a Custom Image layer. About 55 s per texture at 1024
-on a 5070.
+**Textures** — two ways in.
+
+*Describe it* takes any subject in plain language. Raw free text is what produces
+the failures above, so a subject is compiled through a motif table into one of
+five treatments: **Surface**, **Energy**, **Marks**, **Silhouette**,
+**Atmosphere**. "A dragon" becomes overlapping reptilian scales, or roaring fire,
+or raking claw slashes — never a dragon standing in a field. Wolf becomes fur,
+engine becomes machined plating. Unmatched subjects get a generic surface
+treatment rather than an error, and the compiled prompt is shown under every
+result so the translation is visible rather than magic.
+
+*Presets* gives 12 ready-made looks (storm lightning, nebula swirl, fractured
+glass, cracked lava, liquid metal, ink in water, circuit grid, high-contrast
+camo, marble, aurora, carbon weave, topographic).
+
+Colour is a plain-language field because FLUX reads "electric violet", not
+`#7B2FBE`. Output is 2048×2048, ready to drop into Clearcoat as a Custom Image
+layer. About 55 s per texture at 1024 on a 12 GB card.
 
 **Silhouettes** — mountain ridgelines, pine treelines, city skylines and speed
 stripes, drawn mathematically rather than generated. Diffusion gives these mushy
@@ -112,6 +134,8 @@ recolour them in Clearcoat without regenerating anything.
 
 **Squint check** — drop in any render and see what it looks like at track
 distance, with a measured value range.
+
+**Setup** — a checklist of what is and isn't in place, and the model downloader.
 
 ## Value range, and why it is the number that matters
 
@@ -138,10 +162,11 @@ Uses `flux1-dev-fp8` with `clip_l` + `t5xxl_fp8` and the `ae` VAE, driven over
 the HTTP API — queue at `POST /prompt`, poll `/history/<id>`. The Start/Stop
 buttons manage the server.
 
-It launches ComfyUI through **its own venv** (`ComfyUI/venv/Scripts/python.exe`),
-not the system interpreter. The system Python here has neither torch nor
-sqlalchemy, so a bare `python main.py` dies on import long before the model
-loader.
+It launches ComfyUI through **its own venv** (`ComfyUI/venv/Scripts/python.exe`
+or `venv/bin/python`), not the system interpreter — a system Python typically has
+neither torch nor sqlalchemy, so a bare `python main.py` dies on import long
+before the model loader. ComfyUI itself is located by searching the usual install
+paths, with `COMFYUI_DIR` as an override.
 
 **Stop the engine before racing.** ComfyUI holds ~8 GB of VRAM that iRacing
 wants. The Stop button frees it; restarting takes about 40 seconds.
