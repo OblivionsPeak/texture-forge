@@ -11,7 +11,7 @@ from pathlib import Path
 from flask import Flask, jsonify, request, send_file, send_from_directory
 from PIL import Image
 
-from forge import comfy, post, prompts, setup as fsetup, silhouette
+from forge import comfy, post, prompts, providers, setup as fsetup, silhouette
 
 ROOT = Path(__file__).parent
 OUT = ROOT / "out"
@@ -42,6 +42,26 @@ def status():
         "shapes": [{"id": k, "name": v["name"], "hint": v["hint"], "seamless": v["seamless"]}
                    for k, v in silhouette.SHAPES.items()],
     })
+
+
+@app.route("/api/providers")
+def list_providers():
+    return jsonify({
+        "providers": [{"id": k, "name": v["name"], "cloud": v["cloud"],
+                       "hint": v["hint"], "sizes": v["sizes"]}
+                      for k, v in providers.PROVIDERS.items()],
+        "openai_key_set": bool(providers.api_key("openai_api_key")),
+    })
+
+
+@app.route("/api/providers/key", methods=["POST"])
+def set_key():
+    body = request.get_json(force=True) or {}
+    cfg = providers.load_config()
+    cfg["openai_api_key"] = (body.get("openai_api_key") or "").strip()
+    providers.save_config(cfg)
+    ok, msg = providers.test_openai()
+    return jsonify({"ok": ok, "message": msg})
 
 
 @app.route("/api/setup")
@@ -94,7 +114,8 @@ def _finish(img, body, stem):
 def generate():
     body = request.get_json(force=True) or {}
     preset = body.get("preset", "storm")
-    if not comfy.is_up():
+    provider = body.get("provider", "local")
+    if provider == "local" and not comfy.is_up():
         return jsonify({"ok": False, "error": "ComfyUI is not running. Start it first."}), 409
     try:
         if body.get("freeform"):
@@ -109,16 +130,18 @@ def generate():
     seed = int(body.get("seed") or random.randint(1, 2**31 - 1))
     w = int(body.get("width", 1024))
     h = int(body.get("height", 1024))
-    files, err = comfy.generate(pos, neg, w, h, seed,
-                                steps=int(body.get("steps", 20)),
-                                guidance=float(body.get("guidance", 3.5)))
-    if err:
-        return jsonify({"ok": False, "error": err}), 500
+    try:
+        src = providers.generate(provider, prompt=pos, negative=neg, width=w, height=h,
+                                 seed=seed, steps=int(body.get("steps", 20)),
+                                 guidance=float(body.get("guidance", 3.5)),
+                                 quality=body.get("quality", "high"))
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
 
-    img = Image.open(files[0])
+    img = Image.open(src)
     stem = f"{preset}_{seed}_{int(time.time())}"
     payload = _finish(img, body, stem)
-    payload.update({"ok": True, "seed": seed, "prompt": pos})
+    payload.update({"ok": True, "seed": seed, "prompt": pos, "provider": provider})
     return jsonify(payload)
 
 

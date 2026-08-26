@@ -1,8 +1,12 @@
 # Texture Forge
 
 Flat livery textures from local FLUX, plus the silhouette layers diffusion does
-badly. Browser UI on `http://localhost:4796`. Nothing leaves the machine, no API
-keys, no cost per image.
+badly. Browser UI on `http://localhost:4796`.
+
+**Local FLUX is the default**: free, offline, no keys, nothing leaves the
+machine. A cloud engine can be selected instead — see [Engines](#engines) — and
+that does send your prompt to a third party and cost money per image, so it is
+opt-in and labelled everywhere it appears.
 
 **Windows:** double-click **`Start Texture Forge.bat`**.
 **macOS / Linux:** run `./start-texture-forge.sh`.
@@ -170,6 +174,26 @@ paths, with `COMFYUI_DIR` as an override.
 
 **Stop the engine before racing.** ComfyUI holds ~8 GB of VRAM that iRacing
 wants. The Stop button frees it; restarting takes about 40 seconds.
+
+## Engines
+
+| Engine | Cost | Notes |
+|---|---|---|
+| **FLUX (local)** | free | Default. Offline, ~40 s, needs a 12 GB GPU and the engine running. |
+| **GPT Image 2** | ~$0.01 low / $0.05 medium / $0.21 high per image | Cloud. Sends the prompt to OpenAI. Generates up to 2048² directly. |
+
+The key goes in the **Setup** tab and is stored in `config.json`, which is
+gitignored and never committed. `OPENAI_API_KEY` in the environment also works.
+
+**A ChatGPT subscription does not include API access.** They are separate
+products with separate billing. The key comes from `platform.openai.com` and
+needs its own pay-as-you-go credit.
+
+Two behavioural differences worth knowing. Cloud image APIs have **no negative
+prompt field**, so the exclusions that keep vignettes and watermarks out are
+folded into the prompt as explicit instructions instead. And the motif compiler
+matters less on a cloud model — it exists because FLUX paints the noun rather
+than its texture, and stronger instruction-following needs less hand-holding.
 
 ## Where this sits
 

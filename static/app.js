@@ -1,7 +1,7 @@
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
 
-let STATE = { presets: [], shapes: [], treatments: [],
+let STATE = { presets: [], shapes: [], treatments: [], providers: [], provider: 'local',
               preset: 'storm', shape: 'mountains', treatment: 'surface',
               texMode: 'describe', busy: false };
 
@@ -124,20 +124,23 @@ function resultBlock(r, title) {
       <a href="${r.url}" download><button>Download PNG</button></a>
       <button onclick="navigator.clipboard.writeText('${r.file}');">Copy filename</button>
     </div>
-    <p class="meta">Saved to <code>out/${r.file}</code>${r.seed ? ` · seed ${r.seed}` : ''}</p>`;
+    <p class="meta">Saved to <code>out/${r.file}</code>${r.seed ? ` · seed ${r.seed}` : ''}${r.provider ? ` · ${esc(r.provider)}` : ''}</p>`;
 }
 
 $('#btnGen').onclick = async () => {
   if (STATE.busy) return;
+  const prov = STATE.providers.find((x) => x.id === STATE.provider);
   if (STATE.texMode === 'describe' && !$('#subject').value.trim()) {
     toast('Describe what it is inspired by first.', true); return;
   }
   const el = $('#texResult');
   el.classList.remove('empty');
-  busy(true, el, 'Forging… first run also loads the model, so allow a minute.');
+  busy(true, el, prov && prov.cloud ? 'Forging via GPT Image 2…' : 'Forging… first run also loads the model, so allow a minute.');
   try {
     const describing = STATE.texMode === 'describe';
     const r = await api('/api/generate', {
+      provider: STATE.provider,
+      quality: $('#quality') ? $('#quality').value : 'high',
       freeform: describing,
       subject: describing ? $('#subject').value : null,
       treatment: STATE.treatment,
@@ -271,6 +274,53 @@ $('#btnCheck').onclick = async () => {
   busy(false);
 };
 
+/* ------------------------------------------------------------- providers */
+
+async function loadProviders() {
+  try {
+    const d = await (await fetch('/api/providers')).json();
+    STATE.providers = d.providers;
+    renderProviders();
+  } catch (e) { /* engine list is not critical to the rest of the UI */ }
+}
+
+function renderProviders() {
+  $('#providers').innerHTML = STATE.providers.map((p) =>
+    `<button data-id="${p.id}" title="${esc(p.hint)}" class="${p.id === STATE.provider ? 'on' : ''}">
+       <b>${esc(p.name)}</b><i>${p.cloud ? 'cloud · paid' : 'local · free'}</i></button>`).join('');
+  $$('#providers button').forEach((b) => {
+    b.onclick = () => {
+      STATE.provider = b.dataset.id;
+      $$('#providers button').forEach((x) => x.classList.toggle('on', x === b));
+      applyProvider();
+    };
+  });
+  applyProvider();
+}
+
+function applyProvider() {
+  const p = STATE.providers.find((x) => x.id === STATE.provider);
+  if (!p) return;
+  $('#provNote').textContent = p.hint;
+  $('#genSize').innerHTML = p.sizes.map((sz, i) =>
+    `<option value="${sz}"${i === 0 ? ' selected' : ''}>${sz} × ${sz}</option>`).join('');
+  $$('.cloudOnly').forEach((e) => e.classList.toggle('hidden', !p.cloud));
+  $$('.localOnly').forEach((e) => e.classList.toggle('hidden', p.cloud));
+}
+
+$('#btnKey').onclick = async () => {
+  const v = $('#oaiKey').value.trim();
+  if (!v) { toast('Paste a key first.', true); return; }
+  $('#btnKey').disabled = true;
+  try {
+    const r = await api('/api/providers/key', { openai_api_key: v });
+    toast(r.message);
+    $('#oaiKey').value = '';
+    loadProviders();
+  } catch (e) { toast(e.message, true); }
+  $('#btnKey').disabled = false;
+};
+
 /* ---------------------------------------------------------------- setup */
 
 function gb(n) { return (n / 2 ** 30).toFixed(1) + ' GB'; }
@@ -360,5 +410,6 @@ function applyTexMode() {
 }
 
 applyTexMode();
+loadProviders();
 refreshStatus();
 setInterval(refreshStatus, 15000);
