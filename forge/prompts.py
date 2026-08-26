@@ -174,17 +174,69 @@ TREATMENTS = {
 }
 
 # Keyword -> motif. Encodes the bit a designer does automatically: knowing that
-# "dragon" means scales, "wolf" means fur, and "engine" means machined plate.
+# "dragon" means armoured scales while "shark" means sandpapery denticles.
+#
+# Granularity is the whole game here. An earlier version lumped shark, fish,
+# snake and lizard together as "overlapping reptilian scales", so a request for
+# tiger shark skin came back as dragon hide - the model rendered exactly what it
+# was told, and the table was what was wrong.
 MOTIF_TABLE = [
-    (("dragon", "serpent", "snake", "lizard", "reptile", "wyvern", "basilisk",
-      "fish", "koi", "shark", "naga"), "overlapping reptilian scales", "roaring fire and embers",
-     "raking claw slashes", "curling smoke"),
-    (("wolf", "bear", "lion", "tiger", "fox", "boar", "panther", "cat", "hound"),
+    # --- specific species first; longest match wins, so these beat the genera
+    (("tiger shark",),
+     "rough sharkskin covered in fine tooth-like denticles, marked with bold dark vertical bars",
+     "churning bioluminescent water", "raking bite scars", "murky deep-water haze"),
+    (("great white", "mako", "hammerhead", "shark"),
+     "rough sharkskin hide of fine tooth-like dermal denticles, matte sandpaper grain, "
+     "countershaded slate grey",
+     "churning bioluminescent water", "raking bite scars", "murky deep-water haze"),
+    (("whale", "orca", "dolphin"), "smooth rubbery cetacean hide with healed scratch marks",
+     "surging water light", "rake scars", "cold spray mist"),
+    (("koi", "carp", "salmon", "trout", "fish", "piranha", "marlin"),
+     "smooth overlapping round fish scales with iridescent sheen",
+     "rippling water light", "torn scale gouges", "underwater haze"),
+    (("crocodile", "alligator", "gator", "caiman"),
+     "thick keeled crocodilian scutes, blocky raised plates with deep seams",
+     "swamp heat shimmer", "deep bite gouges", "swamp mist"),
+    (("cobra", "viper", "python", "rattlesnake", "serpent", "snake"),
+     "fine diamond-patterned snake scales, tight regular rows",
+     "venomous glow", "fang punctures", "low ground mist"),
+    (("gecko", "iguana", "chameleon", "lizard", "reptile"),
+     "pebbled granular lizard skin, irregular beaded texture",
+     "sun-baked shimmer", "claw scratches", "desert haze"),
+    (("turtle", "tortoise"), "segmented shell scutes in a tessellated mosaic",
+     "sunlit water caustics", "shell fractures", "pond mist"),
+    (("dragon", "wyvern", "drake", "basilisk", "naga"),
+     "large overlapping armoured dragon scales, thick and keeled",
+     "roaring fire and embers", "raking claw slashes", "curling smoke"),
+
+    # --- mammals
+    (("zebra",), "bold black and white stripe pattern", "dust-lit heat haze",
+     "hoof scars", "savanna dust"),
+    (("leopard", "cheetah", "jaguar", "ocelot"), "spotted rosette fur pattern",
+     "heat shimmer", "raking claw slashes", "dry haze"),
+    (("tiger",), "striped tiger fur, bold dark bars through dense pelt",
+     "snarling heat haze", "raking claw slashes", "jungle mist"),
+    (("elephant", "rhino", "hippo"), "deeply cracked leathery hide",
+     "dust-lit glow", "gouged hide scars", "dust cloud"),
+    (("wolf", "bear", "lion", "fox", "boar", "panther", "hound", "husky"),
      "dense animal fur", "snarling heat haze", "raking claw slashes", "cold breath vapour"),
-    (("phoenix", "eagle", "hawk", "raven", "crow", "owl", "bird", "falcon"),
-     "layered feathers", "blazing plumage fire", "talon rakes", "drifting ash and embers"),
-    (("insect", "beetle", "wasp", "hornet", "spider", "mantis", "scarab"),
-     "iridescent chitin plating", "crackling static", "chitin fracture lines", "fine web filaments"),
+
+    # --- birds and insects
+    (("peacock",), "iridescent peacock eye feathers", "shimmering plumage light",
+     "torn quills", "drifting down"),
+    (("phoenix",), "layered burning plumage", "blazing plumage fire",
+     "talon rakes", "drifting ash and embers"),
+    (("eagle", "hawk", "raven", "crow", "owl", "falcon", "bird", "feather"),
+     "layered overlapping feathers", "blazing plumage fire",
+     "talon rakes", "drifting ash and embers"),
+    (("bee", "wasp", "hornet"), "banded chitin with fine bristles",
+     "crackling static", "chitin fracture lines", "fine haze"),
+    (("spider", "web", "arachnid"), "taut spun web filaments",
+     "crackling static", "torn silk", "fine web filaments"),
+    (("beetle", "scarab", "mantis", "insect", "chitin"),
+     "iridescent chitin plating", "crackling static", "chitin fracture lines", "fine haze"),
+
+    # --- materials and elements
     (("skull", "bone", "skeleton", "reaper", "death"),
      "cracked bone surface", "spectral flame", "deep gouges", "graveyard mist"),
     (("volcano", "lava", "magma", "ember", "inferno", "fire", "flame"),
@@ -193,21 +245,27 @@ MOTIF_TABLE = [
      "fractured ice planes", "freezing crystal bloom", "shatter cracks", "frozen fog"),
     (("storm", "thunder", "lightning", "tempest", "hurricane"),
      "churning storm cloud", "forked lightning", "wind-torn gouges", "driving rain haze"),
-    (("ocean", "wave", "water", "tide", "sea", "storm surge"),
+    (("ocean", "wave", "water", "tide", "sea"),
      "breaking wave crests", "bioluminescent surge", "spray-carved channels", "sea mist"),
+    (("camo", "camouflage", "military", "tactical"),
+     "hard-edged camouflage patches", "muzzle flash", "battle scoring", "smoke of battle"),
+    (("armour", "armor", "knight", "chainmail", "plate mail"),
+     "riveted armour plating", "forge sparks", "battle scoring", "smoke of battle"),
     (("machine", "engine", "robot", "mech", "industrial", "gear", "turbine", "piston"),
      "machined metal plating with rivets", "arcing electrical discharge",
      "gouged metal scoring", "exhaust haze"),
     (("circuit", "cyber", "digital", "data", "neon", "tech", "matrix"),
      "dense circuit traces", "streaming data light", "glitch fractures", "neon haze"),
-    (("forest", "tree", "wood", "jungle", "leaf", "vine"),
+    (("forest", "tree", "wood", "bark", "jungle", "leaf", "vine"),
      "gnarled bark and grain", "sunlight shafts", "splintered wood gouges", "forest mist"),
     (("stone", "rock", "granite", "marble", "mountain", "canyon"),
      "riven stone strata", "glowing mineral veins", "chisel fractures", "dust haze"),
     (("galaxy", "nebula", "cosmic", "space", "star", "void", "celestial"),
      "star-flecked cosmic dust", "stellar flare", "rifts torn in space", "nebula clouds"),
-    (("snake", "camo", "military", "tactical", "armour", "armor", "knight"),
-     "riveted armour plating", "forge sparks", "battle scoring", "smoke of battle"),
+    (("carbon", "kevlar", "weave", "fibre", "fiber"),
+     "tight carbon fibre twill weave", "static shimmer", "frayed weave tears", "fine haze"),
+    (("snake skin", "leather", "hide", "suede"),
+     "grained leather hide", "warm sheen", "deep scuffs", "soft haze"),
 ]
 
 DEFAULT_MOTIF = ("richly detailed surface texture", "surging energy",
@@ -215,11 +273,20 @@ DEFAULT_MOTIF = ("richly detailed surface texture", "surging energy",
 
 
 def motifs_for(subject):
-    s = (subject or "").lower()
-    for keys, surface, energy, marks, atmos in MOTIF_TABLE:
-        if any(k in s for k in keys):
-            return surface, energy, marks, atmos
-    return DEFAULT_MOTIF
+    """Longest matching keyword wins.
+
+    First-match-wins is what broke "tiger shark": it hit a generic row before
+    ever reaching the specific one. Scoring by key length means a two-word
+    species name beats both of the single words inside it.
+    """
+    s = " " + (subject or "").lower().strip() + " "
+    best, best_len = None, 0
+    for row in MOTIF_TABLE:
+        keys, motifs = row[0], row[1:]
+        for k in keys:
+            if k in s and len(k) > best_len:
+                best, best_len = motifs, len(k)
+    return best or DEFAULT_MOTIF
 
 
 def compile_freeform(subject, treatment="surface", color=None):
