@@ -57,10 +57,17 @@ def list_providers():
 @app.route("/api/providers/key", methods=["POST"])
 def set_key():
     body = request.get_json(force=True) or {}
+    key, err = providers.clean_key(body.get("openai_api_key"))
+    if err:
+        return jsonify({"ok": False, "message": err}), 400
     cfg = providers.load_config()
-    cfg["openai_api_key"] = (body.get("openai_api_key") or "").strip()
+    cfg["openai_api_key"] = key
     providers.save_config(cfg)
     ok, msg = providers.test_openai()
+    if not ok:
+        # Do not leave a key on disk that we just proved does not work.
+        cfg.pop("openai_api_key", None)
+        providers.save_config(cfg)
     return jsonify({"ok": ok, "message": msg})
 
 

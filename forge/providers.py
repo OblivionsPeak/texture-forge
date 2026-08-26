@@ -31,6 +31,32 @@ def save_config(cfg):
     CONFIG_PATH.write_text(json.dumps(cfg, indent=2), "utf-8")
 
 
+def clean_key(raw):
+    """Normalise a pasted key and reject an obviously mangled one.
+
+    A paste that wraps across lines, loses its prefix, or lands twice in the
+    box otherwise gets stored verbatim and fails later as a confusing 401. Far
+    better to refuse it at the point of entry and say why.
+    """
+    v = "".join((raw or "").split())          # kill all whitespace, including newlines
+    if not v:
+        return None, "empty"
+    # A doubled paste: the tail of one key butted against the head of the next.
+    if v.count("sk-") > 1:
+        first = v.index("sk-")
+        second = v.index("sk-", first + 1)
+        v = v[first:second]
+    if not v.startswith("sk-"):
+        i = v.find("sk-")
+        if i == -1:
+            return None, ("that does not look like an OpenAI key - it should begin with "
+                          "'sk-'. Check the paste did not lose its first characters.")
+        v = v[i:]
+    if len(v) < 40:
+        return None, "that key looks truncated"
+    return v, None
+
+
 def api_key(name):
     import os
     cfg = load_config()
