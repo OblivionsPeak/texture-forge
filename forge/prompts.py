@@ -321,3 +321,68 @@ def build(preset_id, color=None, extra=None):
     if extra:
         text = f"{extra.strip()}, {text}"
     return text, NEGATIVE
+
+
+# ---------------------------------------------------- single subject / decal
+
+# Everything above forces edge-to-edge coverage, which is exactly wrong for a
+# decal. A badge, crest or mask has to be one isolated object with clean space
+# around it so it can be cut out and placed on a panel.
+ISOLATED = (
+    "a single centred subject, complete and entirely within frame with clear margin "
+    "on every side, isolated on a plain flat empty background, no scene, no setting, "
+    "no environment, no horizon, no props, no shadow cast on the background, "
+    "straight-on orthographic view, evenly lit, sharp focus, no text, no watermark"
+)
+
+DECAL_NEGATIVE = (
+    "background scene, landscape, room, environment, horizon, multiple objects, "
+    "cropped, cut off, partial, collage, grid, pattern, tiled, repeating, "
+    "photograph, depth of field, blurry, vignette, text, letters, watermark, "
+    "signature, frame, border"
+)
+
+SUBJECT_STYLES = {
+    "woodblock": {
+        "name": "Woodblock",
+        "hint": "Ukiyo-e print. Bold outlines, flat colour — cuts out cleanly.",
+        "wrap": "traditional Japanese ukiyo-e woodblock print of {subject}, bold black "
+                "outlines, flat unshaded colour areas, limited palette",
+    },
+    "vinyl": {
+        "name": "Vinyl cut",
+        "hint": "Flat vector graphic. Hardest edges, reads best at distance.",
+        "wrap": "bold flat vector graphic of {subject}, thick clean outlines, solid "
+                "colour fills, no gradients, no shading, sticker art, high contrast",
+    },
+    "painted": {
+        "name": "Painted",
+        "hint": "Rich illustrated artwork with depth and shading.",
+        "wrap": "richly painted illustration of {subject}, dramatic lighting, deep "
+                "saturated colour, detailed brushwork",
+    },
+    "etched": {
+        "name": "Etched",
+        "hint": "Fine line engraving. Monochrome, works as an overlay.",
+        "wrap": "fine line engraving of {subject}, dense cross-hatching, etched "
+                "linework, monochrome ink on plain ground",
+    },
+    "chrome": {
+        "name": "Chrome badge",
+        "hint": "Metal emblem with bevel and sheen.",
+        "wrap": "polished chrome metal emblem of {subject}, crisp bevelled edges, "
+                "metallic sheen, cast badge",
+    },
+}
+
+
+def compile_single(subject, style="woodblock", color=None):
+    """One isolated subject for use as a decal, not a repeating surface."""
+    subject = (subject or "").strip()
+    if not subject:
+        raise ValueError("describe what you want first")
+    st = SUBJECT_STYLES.get(style) or SUBJECT_STYLES["woodblock"]
+    body = st["wrap"].format(subject=subject)
+    if color and color.strip():
+        body += f", {color.strip()} colour scheme"
+    return f"{body}, {ISOLATED}", DECAL_NEGATIVE

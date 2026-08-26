@@ -97,7 +97,8 @@ def _flatten_negative(prompt, negative):
             f"no framing, no subject isolated on a background, and no text of any kind.")
 
 
-def generate_openai(prompt, negative, width, height, seed=None, quality="high", **_):
+def generate_openai(prompt, negative, width, height, seed=None, quality="high",
+                    transparent=False, **_):
     key = api_key("openai_api_key")
     if not key:
         raise RuntimeError("No OpenAI API key set. Add one in the Setup tab. "
@@ -108,13 +109,19 @@ def generate_openai(prompt, negative, width, height, seed=None, quality="high", 
     if size not in OPENAI_SIZES:
         size = "1024x1024"
 
-    body = json.dumps({
+    req_body = {
         "model": "gpt-image-2",
         "prompt": _flatten_negative(prompt, negative),
         "size": size,
         "quality": quality,
         "n": 1,
-    }).encode()
+    }
+    if transparent:
+        # Native alpha, so no background has to be keyed out afterwards.
+        # jpeg has no alpha and is rejected outright, hence png.
+        req_body["background"] = "transparent"
+        req_body["output_format"] = "png"
+    body = json.dumps(req_body).encode()
 
     req = urllib.request.Request(
         "https://api.openai.com/v1/images/generations", data=body,

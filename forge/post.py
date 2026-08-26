@@ -5,7 +5,7 @@ make the result tile, and tell you whether it will actually read on a moving
 car — which is the test most liveries fail.
 """
 import numpy as np
-from PIL import Image, ImageEnhance
+from PIL import Image, ImageEnhance, ImageFilter
 
 
 def devignette(img, strength=1.0):
@@ -139,3 +139,74 @@ def to_texture(img, size=2048, do_devignette=True, tile=False,
     if out.size != (size, size):
         out = out.resize((size, size), Image.LANCZOS)
     return out
+
+
+# --------------------------------------------------------------- decal cutout
+
+def cutout(img, tolerance=38, feather=1.0, min_bg_frac=0.02):
+    """Knock out a flat background so a decal can sit on a panel.
+
+    Flood-fills inward from the four corners rather than keying one colour.
+    Keying by colour eats matching pixels inside the subject too - an Oni mask
+    with a white tooth loses the tooth. Only background actually connected to
+    an edge is removed.
+
+    Returns RGBA. If the corners disagree, or almost nothing is removed, the
+    image comes back fully opaque rather than half-destroyed.
+    """
+    rgb = np.asarray(img.convert("RGB")).astype(np.int16)
+    h, w, _ = rgb.shape
+    corners = [rgb[0, 0], rgb[0, w - 1], rgb[h - 1, 0], rgb[h - 1, w - 1]]
+    ref = np.median(np.stack(corners), axis=0)
+
+    # If the corners are wildly different there is no flat background to cut.
+    spread = max(int(np.abs(np.array(c) - ref).sum()) for c in corners)
+    if spread > tolerance * 4:
+        return img.convert("RGBA"), 0.0
+
+    close = (np.abs(rgb - ref).sum(axis=2) <= tolerance * 3)
+
+    # Iterative flood fill from the border, 4-connected, via binary dilation
+    # against the `close` mask - simple and fast enough at this size.
+    from collections import deque
+    keep = np.zeros((h, w), bool)
+    dq = deque()
+    for x in range(w):
+        for y in (0, h - 1):
+            if close[y, x] and not keep[y, x]:
+                keep[y, x] = True; dq.append((y, x))
+    for y in range(h):
+        for x in (0, w - 1):
+            if close[y, x] and not keep[y, x]:
+                keep[y, x] = True; dq.append((y, x))
+    while dq:
+        y, x = dq.popleft()
+        for dy, dx in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            ny, nx = y + dy, x + dx
+            if 0 <= ny < h and 0 <= nx < w and close[ny, nx] and not keep[ny, nx]:
+                keep[ny, nx] = True
+                dq.append((ny, nx))
+
+    frac = float(keep.mean())
+    if frac < min_bg_frac:
+        return img.convert("RGBA"), 0.0        # nothing meaningful to remove
+
+    alpha = np.where(keep, 0, 255).astype(np.uint8)
+    out = Image.fromarray(np.dstack([np.asarray(img.convert("RGB")), alpha]), "RGBA")
+    if feather > 0:
+        a = out.getchannel("A").filter(ImageFilter.GaussianBlur(feather))
+        out.putalpha(a)
+    return out, frac
+
+
+def trim_to_subject(img, pad=0.04):
+    """Crop to the opaque bounding box with a little breathing room."""
+    if img.mode != "RGBA":
+        return img
+    bbox = img.getchannel("A").point(lambda v: 255 if v > 8 else 0).getbbox()
+    if not bbox:
+        return img
+    x0, y0, x1, y1 = bbox
+    px, py = int((x1 - x0) * pad), int((y1 - y0) * pad)
+    return img.crop((max(0, x0 - px), max(0, y0 - py),
+                     min(img.width, x1 + px), min(img.height, y1 + py)))

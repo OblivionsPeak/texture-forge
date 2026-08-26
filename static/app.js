@@ -1,7 +1,7 @@
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
 
-let STATE = { presets: [], shapes: [], treatments: [], providers: [], provider: 'local',
+let STATE = { presets: [], shapes: [], treatments: [], styles: [], providers: [], provider: 'local', style: 'woodblock',
               preset: 'storm', shape: 'mountains', treatment: 'surface',
               texMode: 'describe', busy: false };
 
@@ -46,6 +46,7 @@ async function refreshStatus() {
     STATE.presets = s.presets;
     STATE.shapes = s.shapes;
     STATE.treatments = s.treatments || [];
+    STATE.styles = s.styles || [];
     const dot = $('#engineDot');
     dot.className = 'dot ' + (s.comfy_up ? 'up' : 'down');
     $('#engineText').textContent = s.comfy_up
@@ -53,7 +54,7 @@ async function refreshStatus() {
       : 'engine stopped';
     $('#btnStart').disabled = s.comfy_up;
     $('#btnStop').disabled = !s.comfy_up;
-    if (!$('#presets').children.length) { renderPresets(); renderShapes(); renderTreatments(); }
+    if (!$('#presets').children.length) { renderPresets(); renderShapes(); renderTreatments(); renderStyles(); }
   } catch (e) {
     $('#engineText').textContent = 'server unreachable';
   }
@@ -108,6 +109,20 @@ function renderPresets() {
   if (p) { $('#color').placeholder = p.color; $('#genNote').textContent = p.hint; }
 }
 
+function decalBlock(r) {
+  const cut = r.cutout > 0
+    ? `background removed (${r.cutout}% of frame)`
+    : (r.transparent ? 'returned with transparency' : 'no flat background found to remove');
+  return `
+    <figure style="margin:0;max-width:100%">
+      <img src="${r.url}?t=${Date.now()}" alt="decal"
+           style="background:repeating-conic-gradient(#2a2f3a 0 25%,#20242c 0 50%) 0 0/22px 22px">
+      <figcaption style="font-size:11px;color:var(--mute);margin-top:6px">
+        ${r.size[0]}×${r.size[1]} · ${esc(cut)}</figcaption>
+    </figure>
+    <div class="acts"><a href="${r.url}" download><button>Download PNG</button></a></div>`;
+}
+
 function resultBlock(r, title) {
   const vr = r.value_range;
   return `
@@ -130,8 +145,12 @@ function resultBlock(r, title) {
 $('#btnGen').onclick = async () => {
   if (STATE.busy) return;
   const prov = STATE.providers.find((x) => x.id === STATE.provider);
+  const single = STATE.texMode === 'single';
   if (STATE.texMode === 'describe' && !$('#subject').value.trim()) {
     toast('Describe what it is inspired by first.', true); return;
+  }
+  if (single && !$('#subjectSingle').value.trim()) {
+    toast('Say what the image should be first.', true); return;
   }
   const el = $('#texResult');
   el.classList.remove('empty');
@@ -139,10 +158,12 @@ $('#btnGen').onclick = async () => {
   try {
     const describing = STATE.texMode === 'describe';
     const r = await api('/api/generate', {
+      kind: single ? 'decal' : 'texture',
+      subject: single ? $('#subjectSingle').value : (describing ? $('#subject').value : null),
+      style: STATE.style,
       provider: STATE.provider,
       quality: $('#quality') ? $('#quality').value : 'high',
       freeform: describing,
-      subject: describing ? $('#subject').value : null,
       treatment: STATE.treatment,
       preset: STATE.preset,
       color: $('#color').value || null,
@@ -155,7 +176,7 @@ $('#btnGen').onclick = async () => {
       contrast: +$('#contrast').value,
       saturation: +$('#sat').value,
     });
-    el.innerHTML = resultBlock(r, 'Texture')
+    el.innerHTML = (single ? decalBlock(r) : resultBlock(r, 'Texture'))
       + (r.prompt ? `<div class="prompt-peek"><b>Prompt sent:</b> ${esc(r.prompt)}</div>` : '');
     toast(r.value_range.ok
       ? 'Forged. This one will read at distance.'
@@ -401,12 +422,29 @@ $('#btnInstall').onclick = async () => {
   refreshSetup(false);
 };
 
+function renderStyles() {
+  const box = $('#styles');
+  if (!box) return;
+  box.innerHTML = STATE.styles.map((t) =>
+    `<button data-id="${t.id}" title="${esc(t.hint)}" class="${t.id === STATE.style ? 'on' : ''}">
+       <b>${esc(t.name)}</b><i>${esc(t.hint.split('.')[0])}</i></button>`).join('');
+  $$('#styles button').forEach((b) => {
+    b.onclick = () => {
+      STATE.style = b.dataset.id;
+      $$('#styles button').forEach((x) => x.classList.toggle('on', x === b));
+    };
+  });
+}
+
 function applyTexMode() {
-  const describing = STATE.texMode === 'describe';
-  $$('#texMode button').forEach((x) => x.classList.toggle('on', (x.dataset.m === 'describe') === describing));
-  $('#describeBox').classList.toggle('hidden', !describing);
-  $('#presetBox').classList.toggle('hidden', describing);
-  $$('.presetOnly').forEach((e) => e.classList.toggle('hidden', describing));
+  const m = STATE.texMode;
+  $$('#texMode button').forEach((x) => x.classList.toggle('on', x.dataset.m === m));
+  $('#describeBox').classList.toggle('hidden', m !== 'describe');
+  $('#presetBox').classList.toggle('hidden', m !== 'preset');
+  $('#singleBox').classList.toggle('hidden', m !== 'single');
+  $$('.presetOnly').forEach((e) => e.classList.toggle('hidden', m !== 'preset'));
+  // Tiling and vignette controls make no sense for a cut-out decal.
+  $$('.textureOnly').forEach((e) => e.classList.toggle('hidden', m === 'single'));
 }
 
 applyTexMode();

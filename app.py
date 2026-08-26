@@ -39,6 +39,8 @@ def status():
         "presets": [{k: p[k] for k in ("id", "name", "hint", "color")} for p in prompts.PRESETS],
         "treatments": [{"id": k, "name": v["name"], "hint": v["hint"]}
                        for k, v in prompts.TREATMENTS.items()],
+        "styles": [{"id": k, "name": v["name"], "hint": v["hint"]}
+                   for k, v in prompts.SUBJECT_STYLES.items()],
         "shapes": [{"id": k, "name": v["name"], "hint": v["hint"], "seamless": v["seamless"]}
                    for k, v in silhouette.SHAPES.items()],
     })
@@ -117,6 +119,23 @@ def _finish(img, body, stem):
     }
 
 
+def _finish_decal(img, stem, provider):
+    """Decals keep their alpha and their aspect - no tiling, no square crop."""
+    removed = 0.0
+    if img.mode != "RGBA" or img.getchannel("A").getextrema()[0] == 255:
+        # No alpha came back (local FLUX, or a cloud image with an opaque
+        # background), so knock the flat background out ourselves.
+        img, removed = post.cutout(img)
+    img = post.trim_to_subject(img)
+    name = f"{stem}.png"
+    img.save(OUT / name)
+    return {
+        "file": name, "url": f"/out/{name}", "size": img.size,
+        "cutout": round(removed * 100, 1),
+        "transparent": img.mode == "RGBA" and img.getchannel("A").getextrema()[0] < 255,
+    }
+
+
 @app.route("/api/generate", methods=["POST"])
 def generate():
     body = request.get_json(force=True) or {}
@@ -124,8 +143,13 @@ def generate():
     provider = body.get("provider", "local")
     if provider == "local" and not comfy.is_up():
         return jsonify({"ok": False, "error": "ComfyUI is not running. Start it first."}), 409
+    kind = body.get("kind", "texture")
     try:
-        if body.get("freeform"):
+        if kind == "decal":
+            pos, neg = prompts.compile_single(
+                body.get("subject"), body.get("style", "woodblock"), body.get("color"))
+            preset = "decal"
+        elif body.get("freeform"):
             pos, neg = prompts.compile_freeform(
                 body.get("subject"), body.get("treatment", "surface"), body.get("color"))
             preset = "freeform"
@@ -141,13 +165,14 @@ def generate():
         src = providers.generate(provider, prompt=pos, negative=neg, width=w, height=h,
                                  seed=seed, steps=int(body.get("steps", 20)),
                                  guidance=float(body.get("guidance", 3.5)),
-                                 quality=body.get("quality", "high"))
+                                 quality=body.get("quality", "high"),
+                                 transparent=(kind == "decal"))
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
 
     img = Image.open(src)
     stem = f"{preset}_{seed}_{int(time.time())}"
-    payload = _finish(img, body, stem)
+    payload = _finish_decal(img, stem, provider) if kind == "decal" else _finish(img, body, stem)
     payload.update({"ok": True, "seed": seed, "prompt": pos, "provider": provider})
     return jsonify(payload)
 
