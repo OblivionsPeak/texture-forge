@@ -104,18 +104,35 @@ def start(wait=240):
         return False, f"ComfyUI not found at {COMFY_DIR}"
     flags = ["--listen", HOST, "--port", str(PORT)]
     creation = subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0
-    subprocess.Popen(
+    # Keep the child's output. Discarding it to DEVNULL meant a launch that died
+    # on startup looked identical to one that was merely slow, and the only
+    # symptom was a 240s timeout with no explanation anywhere.
+    log_path = Path(__file__).parent.parent / "out" / "comfy-launch.log"
+    log_path.parent.mkdir(exist_ok=True)
+    log = open(log_path, "wb")
+    proc = subprocess.Popen(
         [python_exe(), str(main), *flags],
         cwd=str(COMFY_DIR),
-        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        stdout=log, stderr=subprocess.STDOUT,
         creationflags=creation,
     )
     deadline = time.time() + wait
     while time.time() < deadline:
         if is_up(2):
             return True, "started"
+        # If the child is already gone, waiting the full timeout tells the user
+        # nothing. Surface what it printed on the way out instead.
+        if proc.poll() is not None:
+            try:
+                log.flush()
+                tail = log_path.read_text("utf-8", "replace").strip().splitlines()[-6:]
+            except Exception:
+                tail = []
+            detail = " / ".join(t.strip() for t in tail if t.strip())[:300]
+            return False, (f"ComfyUI exited immediately (code {proc.returncode}). "
+                           f"{detail or 'See out/comfy-launch.log.'}")
         time.sleep(2)
-    return False, f"ComfyUI did not answer within {wait}s"
+    return False, f"ComfyUI did not answer within {wait}s (see out/comfy-launch.log)"
 
 
 def stop():
