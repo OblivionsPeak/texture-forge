@@ -124,7 +124,7 @@ function decalBlock(r) {
 }
 
 function resultBlock(r, title) {
-  const vr = r.value_range;
+  const vr = r.value_range || { spread: '—', verdict: 'not measured', ok: true };
   return `
     <div class="pair">
       <figure><img src="${r.url}?t=${Date.now()}" alt="texture">
@@ -178,9 +178,23 @@ $('#btnGen').onclick = async () => {
     });
     el.innerHTML = (single ? decalBlock(r) : resultBlock(r, 'Texture'))
       + (r.prompt ? `<div class="prompt-peek"><b>Prompt sent:</b> ${esc(r.prompt)}</div>` : '');
-    toast(r.value_range.ok
-      ? 'Forged. This one will read at distance.'
-      : 'Forged — but the value range is low, so it may go flat on track. Try raising contrast.');
+    // A decal has no value range: the metric predicts how a SURFACE reads at
+    // distance, which says nothing useful about a cut-out badge. Reading it
+    // unconditionally crashed Single image mode after every successful
+    // generation - the file was written, only the result rendering blew up.
+    if (single) {
+      toast(r.cutout > 0
+        ? `Forged. Background removed (${r.cutout}% of frame).`
+        : (r.transparent
+            ? 'Forged with a transparent background.'
+            : 'Forged — no flat background was found to remove, so it came back opaque.'));
+    } else if (r.value_range) {
+      toast(r.value_range.ok
+        ? 'Forged. This one will read at distance.'
+        : 'Forged — but the value range is low, so it may go flat on track. Try raising contrast.');
+    } else {
+      toast('Forged.');
+    }
   } catch (e) {
     el.innerHTML = `<p style="color:var(--bad);max-width:52ch">${e.message}</p>`;
     toast(e.message, true);
