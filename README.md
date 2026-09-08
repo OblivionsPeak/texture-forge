@@ -107,7 +107,7 @@ Every preset here is written for **flat 2D artwork, orthographic, evenly lit,
 no depth of field, no vignette, no text**. That single change is the difference
 between a nice picture and a usable texture.
 
-## Six tabs
+## Five tabs
 
 **Textures** — two ways in.
 
@@ -180,60 +180,19 @@ samples the rim colour where the subject meets the background and peels
 inward while pixels stay pale, so the decal lands on a dark panel without a
 white halo. A marigold's orange edge fails the paleness test and is left alone.
 
-## Painting the real template
+## What was tried and dropped
 
-The **Paint** tab produces a finished paint sheet for a
-specific iRacing car, exported as TGA. Nothing is traced by hand.
-
-**Drop in the car's paint-kit PSD.** Four hidden layers inside every kit carry
-what a generator needs, and they are read raw (they ship switched off):
-
-| Layer | What it gives |
-|---|---|
-| `Mask` | the paintable area (inverted: the layer marks dead space) |
-| `Wire` | the polygon mesh — its density is a free curvature map |
-| `Sponsor Blocks` / `Sponsor` | where iRacing's artists say a sponsor decal sits flat |
-| `Number Blocks` / `Numbers` | where the race number goes |
-
-Checked on four kits (992 GT3 R, M4 GT4, AMG GT3 2020, Dallara P217): all four
-yielded 8–11 sponsor zones and 3–6 number zones. A kit with no block layers
-falls back to flat areas found from the curvature map.
-
-**Pick a base.** *Kontext* sends the clean shaded sheet to FLUX Kontext dev with
-the brief and it paints straight onto the sheet, keeping every part where the
-template put it — about 75 s on the 5070. Measured honestly, it does not
-understand the car: it fills each panel with pattern centred on that panel,
-and given a concept render as a second reference it draws the motifs and
-throws the sheet layout away. It is a base, not a design. Motifs, wordmark and
-numbers are placed on top by the zone logic below, which is where the design
-comes from. *Texture* stretches or tiles anything from the Textures tab. *Colour* is a flat
-fill.
-
-**Add a concept pack and a number.** The wordmark lands on the two flattest wide
-sponsor zones, motifs fill the rest, the number is rendered into every number
-zone. Placements on curved zones are flagged.
-
-**Export.** `car.tga`, a derived `car_spec.tga`, `paint.png` for Clearcoat, and a
-shaded preview. The template still cannot say which panel edges meet in 3D, so
-seams are checked in the sim, not here.
-
-Feeding an edit model the composite (with the faint mesh and the kit's decals)
-made it paint the mesh lines and the Porsche crest into the livery. The clean
-sheet — body layer only, dead space dark — fixed that in one run.
-
-The commercial "paint your real template" tools most plausibly run a hosted
-image-edit model with the flattened sheet as input, priced per render into
-credits. That route was tried here and it does reproduce a concept render onto
-the sheet panel by panel; it was removed again because it needs an API key
-and sends the template off the machine, which this tool does not do. Kontext ships as a split
-UNet (`flux1-dev-kontext_fp8_scaled.safetensors`, 11.9 GB) and shares the FLUX
-dev text encoders and VAE.
-
-**Windows lets two servers bind port 4796 at once**, after which requests are
-split between old and new code at random. That presented as "the new tab 404s"
-and "auto-fill stopped working". The app now refuses to start if something
-already answers on the port, and the launcher reinstalls dependencies whenever
-`requirements.txt` changes.
+A **Paint** tab once turned an iRacing paint-kit PSD into a finished sheet:
+the kit's hidden `Mask`, `Wire`, `Sponsor Blocks` and `Number Blocks` layers
+give the paintable area, a curvature map and iRacing's own decal zones with no
+tracing, and motifs, wordmark and number were placed into those zones over a
+generated base. The zone reading worked on every kit tried. The base did not:
+a local edit model fills each panel with pattern and does not understand the
+car, and the one engine that did reproduce a design panel by panel was a paid
+cloud model this tool does not ship. Without a base worth placing onto, the
+tab was removed. The zone-reading technique is recorded here in case it is
+useful again: the layers ship switched off and must be read raw, `Mask` is
+inverted, and `Wire` is the full polygon mesh rather than panel outlines.
 
 ## Value range, and why it is the number that matters
 
@@ -271,9 +230,9 @@ wants. The Stop button frees it; restarting takes about 40 seconds.
 
 ## Engine
 
-One engine: FLUX.1-dev through a local ComfyUI, plus FLUX Kontext dev for the
-Paint tab's template base. Both are free, offline and hold VRAM only while the
-engine is running — press **Stop** before racing. No API keys anywhere.
+One engine: FLUX.1-dev through a local ComfyUI. Free, offline, and it holds
+VRAM only while the engine is running — press **Stop** before racing. No API
+keys anywhere.
 
 ## Where this sits
 

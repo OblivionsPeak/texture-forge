@@ -11,8 +11,7 @@ from pathlib import Path
 from flask import Flask, jsonify, request, send_file, send_from_directory
 from PIL import Image
 
-from forge import (comfy, concept, paint, post, prompts, providers, setup as fsetup,
-                   silhouette, template as tmpl)
+from forge import comfy, concept, post, prompts, providers, setup as fsetup, silhouette
 
 ROOT = Path(__file__).parent
 OUT = ROOT / "out"
@@ -282,69 +281,6 @@ def concept_palette():
         return jsonify({"ok": False, "error": "no image"}), 400
     img = Image.open(io.BytesIO(f.read()))
     return jsonify({"ok": True, "palette": concept.extract_palette(img)})
-
-
-# ------------------------------------------------------------ templates / paint
-
-@app.route("/api/templates")
-def templates_list():
-    return jsonify({"ok": True, "templates": tmpl.list_templates(),
-                    "kontext_ready": comfy.kontext_ready()})
-
-
-@app.route("/api/templates/<slug>")
-def templates_info(slug):
-    info = tmpl.load_info(slug)
-    if not info:
-        return jsonify({"ok": False, "error": "no such template"}), 404
-    return jsonify({"ok": True, **info})
-
-
-@app.route("/api/templates/ingest", methods=["POST"])
-def templates_ingest():
-    """Accept an uploaded PSD, or a path to one already on disk."""
-    f = request.files.get("psd")
-    if f:
-        name = Path(f.filename or "template.psd").name
-        if not name.lower().endswith((".psd", ".psb")):
-            return jsonify({"ok": False, "error": "upload the .psd from the iRacing paint kit"}), 400
-        keep = OUT / "templates" / "_uploads"
-        keep.mkdir(parents=True, exist_ok=True)
-        path = keep / name
-        f.save(path)
-    else:
-        path = Path((request.get_json(silent=True) or {}).get("path", ""))
-        if not path.exists():
-            return jsonify({"ok": False, "error": "file not found"}), 400
-    try:
-        info = tmpl.ingest(path, force=True)
-    except Exception as e:
-        return jsonify({"ok": False, "error": f"could not read that template: {e}"}), 500
-    return jsonify({"ok": True, **info})
-
-
-@app.route("/api/packs")
-def packs_list():
-    return jsonify({"ok": True, "packs": paint.list_packs(), "textures": paint.list_textures()})
-
-
-@app.route("/api/paint/start", methods=["POST"])
-def paint_start():
-    body = request.get_json(force=True) or {}
-    if body.get("base") == "kontext":
-        if not comfy.kontext_ready():
-            return jsonify({"ok": False, "error": "The Kontext model is not installed yet."}), 409
-        if not comfy.is_up():
-            return jsonify({"ok": False, "error": "ComfyUI is not running. Start it first."}), 409
-    return jsonify({"ok": True, "job": paint.start(body)})
-
-
-@app.route("/api/paint/job/<job_id>")
-def paint_job(job_id):
-    j = paint.get(job_id)
-    if not j:
-        return jsonify({"ok": False, "error": "no such job"}), 404
-    return jsonify({"ok": True, **j})
 
 
 def _already_running(port=4796):
