@@ -461,6 +461,180 @@ function applyTexMode() {
   $$('.textureOnly').forEach((e) => e.classList.toggle('hidden', m === 'single'));
 }
 
+/* -------------------------------------------------------------- concept */
+
+const C = { style: 'vinyl', provider: 'local', wordmark: null, job: null, timer: null, suggestTimer: null };
+
+function renderConceptStyles() {
+  const box = $('#cStyles');
+  if (!box || !STATE.styles.length) return;
+  box.innerHTML = STATE.styles.map((t) =>
+    `<button data-id="${t.id}" title="${esc(t.hint)}" class="${t.id === C.style ? 'on' : ''}">
+       <b>${esc(t.name)}</b><i>${esc(t.hint.split('.')[0])}</i></button>`).join('');
+  $$('#cStyles button').forEach((b) => {
+    b.onclick = () => {
+      C.style = b.dataset.id;
+      $$('#cStyles button').forEach((x) => x.classList.toggle('on', x === b));
+    };
+  });
+}
+
+function renderConceptProviders() {
+  const box = $('#cProviders');
+  if (!box || !STATE.providers.length) return;
+  box.innerHTML = STATE.providers.map((p) =>
+    `<button data-id="${p.id}" title="${esc(p.hint)}" class="${p.id === C.provider ? 'on' : ''}">
+       <b>${esc(p.name)}</b><i>${p.cloud ? 'cloud · paid · writes text' : 'local · free · no text'}</i></button>`).join('');
+  $$('#cProviders button').forEach((b) => {
+    b.onclick = () => {
+      C.provider = b.dataset.id;
+      $$('#cProviders button').forEach((x) => x.classList.toggle('on', x === b));
+      conceptProvNote();
+    };
+  });
+  conceptProvNote();
+}
+
+function conceptProvNote() {
+  const p = STATE.providers.find((x) => x.id === C.provider);
+  if (!p) return;
+  $('#cProvNote').textContent = p.cloud
+    ? 'GPT Image 2 can write the team name onto the render legibly. Each motif is a separate paid image.'
+    : 'Local FLUX leaves a blank white panel where the team name goes; the wordmark ships separately. Roughly 40s per image.';
+}
+
+async function conceptSuggest() {
+  const brief = $('#cBrief').value.trim();
+  try {
+    const r = await api('/api/concept/suggest', { brief });
+    if (!$('#cCar').children.length) {
+      $('#cCar').innerHTML = r.cars.map((c) => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
+    }
+    if (!brief) { $('#cSuggest').textContent = ''; return; }
+    const ta = $('#cMotifs');
+    // Only overwrite the motif box if the user hasn't typed their own list.
+    if (!ta.value.trim() || ta.dataset.auto === '1') {
+      ta.value = r.motifs.join('\n');
+      ta.dataset.auto = '1';
+    }
+    if (r.palette_hint && !$('#cPalette').value.trim()) $('#cPalette').placeholder = r.palette_hint;
+    if (r.style) { C.style = r.style; renderConceptStyles(); }
+    $('#cSuggest').textContent = r.theme
+      ? `Recognised as "${r.theme}" — motif list filled in. Edit it freely.`
+      : 'No known theme matched. Replace the three generic lines with the motifs you want.';
+  } catch (e) { /* suggestion is a convenience */ }
+}
+
+$('#cBrief').addEventListener('input', () => {
+  clearTimeout(C.suggestTimer);
+  C.suggestTimer = setTimeout(conceptSuggest, 350);
+});
+$('#cMotifs').addEventListener('input', () => { $('#cMotifs').dataset.auto = '0'; });
+
+$('#cWordmark').addEventListener('change', async () => {
+  const f = $('#cWordmark').files[0];
+  if (!f) { C.wordmark = null; return; }
+  try {
+    const fd = new FormData();
+    fd.append('image', f);
+    const r = await api('/api/concept/wordmark', fd, true);
+    C.wordmark = r.file;
+    toast('Wordmark will ship in the pack.');
+  } catch (e) { C.wordmark = null; toast(e.message, true); }
+});
+
+function packBlock(j, motifs) {
+  const done = j.done && !j.error;
+  const pct = j.total ? Math.round(100 * j.progress / j.total) : 0;
+  const status = j.error
+    ? `<div class="verdict bad"><b>Failed</b> — ${esc(j.error)}</div>`
+    : (done
+        ? `<div class="verdict good"><b>Pack built</b> — ${j.assets.length} motif${j.assets.length === 1 ? '' : 's'}${j.render ? ' + render' : ''}${j.wordmark ? ' + wordmark' : ''}. Saved to <code>out/${esc(j.folder)}/</code></div>`
+        : `<div class="bar-out"><div class="bar-in" style="width:${pct}%"></div></div>
+           <p class="steps"><span class="spin" style="display:inline-block;width:12px;height:12px;vertical-align:middle;margin-right:8px"></span><b>${esc(j.step)}</b> · ${j.progress}/${j.total}</p>`);
+
+  const hero = j.render
+    ? `<div class="hero"><img src="${j.render.url}?t=${j.render.seed}" alt="concept render">
+         <p class="meta" style="margin-top:6px">Studio render · ${j.render.size[0]}×${j.render.size[1]} · seed ${j.render.seed} · a pitch image, not a paint file</p></div>`
+    : (j.step.startsWith('rendering') ? `<div class="hero"><div class="spin"></div><p class="meta">Rendering the car…</p></div>` : '');
+
+  const pal = j.palette && j.palette.length
+    ? `<div><h3>Palette</h3><div class="swatches">${j.palette.map((p) =>
+        `<div class="swatch" title="click to copy" onclick="navigator.clipboard.writeText('${p.hex}')">
+           <i style="background:${p.hex}"></i><b>${p.hex}</b>${p.role ? `<span>${p.role}</span>` : ''}</div>`).join('')}
+       </div></div>` : '';
+
+  const doneNames = new Set(j.assets.map((a) => a.subject));
+  const cards = motifs.map((m, i) => {
+    const a = j.assets.find((x) => x.subject === m);
+    if (a) {
+      const cut = a.cutout > 0 ? `bg removed ${a.cutout}%` : (a.transparent ? 'transparent' : 'opaque — no flat bg found');
+      return `<figure><img src="${a.url}" alt="${esc(m)}">
+        <figcaption>${esc(m)}<br><span class="meta">${a.size[0]}×${a.size[1]} · ${cut}</span><br>
+        <a href="${a.url}" download>Download</a></figcaption></figure>`;
+    }
+    return `<figure class="pending"><img alt=""><figcaption>${esc(m)}<br><span class="meta">${j.step.includes(`${i + 1}/`) ? 'forging…' : 'queued'}</span></figcaption></figure>`;
+  }).join('');
+  const motifBlock = motifs.length ? `<div><h3>Motifs</h3><div class="motifs">${cards}</div></div>` : '';
+
+  const wm = j.wordmark
+    ? `<div><h3>Wordmark</h3><div class="motifs"><figure><img src="${j.wordmark.url}" alt="wordmark"><figcaption>${esc(j.wordmark.name)} · passed through untouched</figcaption></figure></div></div>` : '';
+
+  const acts = done
+    ? `<div class="acts"><a href="${j.zip}" download><button class="primary">Download pack (.zip)</button></a>
+       ${j.render ? `<a href="${j.render.url}" download><button>Render PNG</button></a>` : ''}</div>` : '';
+
+  return `<div class="pack">${status}${hero}${pal}${motifBlock}${wm}${acts}
+    ${j.render && j.render.prompt ? `<div class="prompt-peek"><b>Render prompt:</b> ${esc(j.render.prompt)}</div>` : ''}</div>`;
+}
+
+$('#btnConcept').onclick = async () => {
+  if (STATE.busy) return;
+  const brief = $('#cBrief').value.trim();
+  if (!brief) { toast('Write the brief first.', true); return; }
+  const motifs = $('#cMotifs').value.split('\n').map((s) => s.trim()).filter(Boolean);
+  const el = $('#conceptResult');
+  el.classList.remove('empty');
+  busy(true, el, 'Starting…');
+  try {
+    const r = await api('/api/concept/start', {
+      brief, team: $('#cTeam').value, car: $('#cCar').value,
+      palette_hint: $('#cPalette').value, motifs, style: C.style,
+      provider: C.provider, quality: 'high', steps: 20,
+      render: $('#cRender').checked,
+      seed: $('#cSeed').value ? +$('#cSeed').value : null,
+      wordmark_file: C.wordmark,
+    });
+    C.job = r.job;
+    const poll = async () => {
+      let j;
+      try { j = await (await fetch('/api/concept/job/' + C.job)).json(); }
+      catch (e) { C.timer = setTimeout(poll, 2000); return; }
+      el.innerHTML = packBlock(j, motifs);
+      if (j.done) {
+        busy(false);
+        toast(j.error ? j.error : 'Concept pack built.', !!j.error);
+      } else {
+        C.timer = setTimeout(poll, 2000);
+      }
+    };
+    poll();
+  } catch (e) {
+    el.innerHTML = `<p style="color:var(--bad);max-width:52ch">${esc(e.message)}</p>`;
+    toast(e.message, true);
+    busy(false);
+  }
+};
+
+const _loadProviders = loadProviders;
+loadProviders = async function () { await _loadProviders(); renderConceptProviders(); };
+const _refreshStatus = refreshStatus;
+refreshStatus = async function () {
+  await _refreshStatus();
+  if (!$('#cStyles').children.length) renderConceptStyles();
+};
+conceptSuggest();
+
 applyTexMode();
 loadProviders();
 refreshStatus();

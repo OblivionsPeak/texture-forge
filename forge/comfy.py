@@ -246,10 +246,17 @@ def queue(workflow):
 def wait_for(prompt_id, timeout=600, poll=2.0):
     """Block until the job appears in history, then return output file paths."""
     deadline = time.time() + timeout
+    misses = 0
     while time.time() < deadline:
         try:
             hist = _get(f"/history/{prompt_id}", timeout=10)
+            misses = 0
         except Exception:
+            # A closed ComfyUI console otherwise looks like a slow render for
+            # the full ten minutes. Three straight misses means it is gone.
+            misses += 1
+            if misses >= 3 and not is_up(2):
+                return None, "ComfyUI stopped answering mid-render (was its console window closed?). Press Start engine."
             time.sleep(poll)
             continue
         entry = hist.get(prompt_id)

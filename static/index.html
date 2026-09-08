@@ -25,6 +25,7 @@
 </header>
 
 <nav class="tabs">
+  <button data-tab="concept">Concept</button>
   <button data-tab="texture" class="on">Textures</button>
   <button data-tab="shape">Silhouettes</button>
   <button data-tab="check">Squint check</button>
@@ -32,6 +33,46 @@
 </nav>
 
 <main>
+  <!-- ===================== CONCEPT ===================== -->
+  <section id="tab-concept" class="tab">
+    <aside class="panel">
+      <h2>The brief</h2>
+      <input id="cBrief" type="text" placeholder="Day of the Dead, inspired by Operation Motorsport" autocomplete="off">
+      <p class="tip">One line, like you'd say it to a designer. Known themes fill the motif list below; anything else gets three generic slots to rewrite.</p>
+
+      <label class="row" style="margin-top:10px"><span>Team name</span><input id="cTeam" type="text" placeholder="Operation Motorsport"></label>
+      <label class="row"><span>Car</span><select id="cCar"></select></label>
+      <label class="row"><span>Colours</span><input id="cPalette" type="text" placeholder="black with orange, magenta, violet"></label>
+
+      <h2>Motifs <span class="opt">one per line — each becomes a cut-out PNG</span></h2>
+      <textarea id="cMotifs" rows="6" placeholder="a sugar skull&#10;a marigold&#10;a papel picado banner"></textarea>
+      <div id="cSuggest" class="tip"></div>
+
+      <h2>Motif style</h2>
+      <div id="cStyles" class="presets"></div>
+
+      <h2>Wordmark <span class="opt">optional</span></h2>
+      <input id="cWordmark" type="file" accept=".png,.svg,.webp">
+      <p class="tip">Lettering is never generated — diffusion melts it. Drop the real logo here and it ships in the pack untouched.</p>
+
+      <h2>Engine</h2>
+      <div id="cProviders" class="presets"></div>
+      <p class="tip" id="cProvNote"></p>
+
+      <label class="chk" style="margin-top:10px"><input id="cRender" type="checkbox" checked> Studio render of the car</label>
+      <label class="row"><span>Seed</span><input id="cSeed" type="number" placeholder="random"></label>
+
+      <button id="btnConcept" class="primary big">Build concept pack</button>
+      <p class="tip" id="cNote"></p>
+    </aside>
+
+    <div class="stage">
+      <div id="conceptResult" class="result empty">
+        <p>Write a brief and build. You get a side-profile studio render to pitch with, every motif as its own alpha-cut PNG, the palette as hex, and a zip of the lot. Placement still happens in Clearcoat on the real template — the render is a pitch image, not a paint file.</p>
+      </div>
+    </div>
+  </section>
+
   <!-- ===================== TEXTURES ===================== -->
   <section id="tab-texture" class="tab on">
     <aside class="panel">

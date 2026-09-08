@@ -11,7 +11,7 @@ from pathlib import Path
 from flask import Flask, jsonify, request, send_file, send_from_directory
 from PIL import Image
 
-from forge import comfy, post, prompts, providers, setup as fsetup, silhouette
+from forge import comfy, concept, post, prompts, providers, setup as fsetup, silhouette
 
 ROOT = Path(__file__).parent
 OUT = ROOT / "out"
@@ -227,6 +227,60 @@ def analyze():
     return jsonify({"ok": True,
                     "value_range": post.value_range(img, isolate_paint=is_render),
                     "squint_url": f"/out/{stem}_squint.png"})
+
+
+@app.route("/api/concept/suggest", methods=["POST"])
+def concept_suggest():
+    """Turn a brief into an editable motif list before anything is generated."""
+    body = request.get_json(force=True) or {}
+    return jsonify({"ok": True, **concept.suggest(body.get("brief", "")),
+                    "cars": [{"id": k, "name": v.split(" with")[0].replace("a ", "", 1)}
+                             for k, v in concept.CARS.items()]})
+
+
+@app.route("/api/concept/wordmark", methods=["POST"])
+def concept_wordmark():
+    """Stash an uploaded logo so the pack can carry it through untouched."""
+    f = request.files.get("image")
+    if not f:
+        return jsonify({"ok": False, "error": "no image"}), 400
+    ext = Path(f.filename or "wordmark.png").suffix.lower() or ".png"
+    if ext not in (".png", ".svg", ".webp"):
+        return jsonify({"ok": False, "error": "use a PNG, SVG or WebP with transparency"}), 400
+    path = OUT / f"_wordmark_{int(time.time())}{ext}"
+    f.save(path)
+    return jsonify({"ok": True, "file": str(path), "url": f"/out/{path.name}"})
+
+
+@app.route("/api/concept/start", methods=["POST"])
+def concept_start():
+    body = request.get_json(force=True) or {}
+    provider = body.get("provider", "local")
+    if provider == "local" and not comfy.is_up():
+        return jsonify({"ok": False, "error": "ComfyUI is not running. Start it first."}), 409
+    if not (body.get("brief") or "").strip():
+        return jsonify({"ok": False, "error": "write a brief first"}), 400
+    if not body.get("render", True) and not body.get("motifs"):
+        return jsonify({"ok": False, "error": "nothing to make: enable the render or add a motif"}), 400
+    return jsonify({"ok": True, "job": concept.start(body)})
+
+
+@app.route("/api/concept/job/<job_id>")
+def concept_job(job_id):
+    j = concept.get(job_id)
+    if not j:
+        return jsonify({"ok": False, "error": "no such job"}), 404
+    return jsonify({"ok": True, **j})
+
+
+@app.route("/api/concept/palette", methods=["POST"])
+def concept_palette():
+    """Palette from any render you already have, such as one ChatGPT made."""
+    f = request.files.get("image")
+    if not f:
+        return jsonify({"ok": False, "error": "no image"}), 400
+    img = Image.open(io.BytesIO(f.read()))
+    return jsonify({"ok": True, "palette": concept.extract_palette(img)})
 
 
 if __name__ == "__main__":

@@ -109,7 +109,7 @@ Every preset here is written for **flat 2D artwork, orthographic, evenly lit,
 no depth of field, no vignette, no text**. That single change is the difference
 between a nice picture and a usable texture.
 
-## Four tabs
+## Five tabs
 
 **Textures** — two ways in.
 
@@ -140,6 +140,33 @@ recolour them in Clearcoat without regenerating anything.
 distance, with a measured value range.
 
 **Setup** — a checklist of what is and isn't in place, and the model downloader.
+
+## Concept packs
+
+The **Concept** tab is the "ask ChatGPT for a mock-up" workflow, run locally.
+One brief — *Day of the Dead, inspired by Operation Motorsport* — produces:
+
+1. a **side-profile studio render** of the car wearing the concept, for pitching;
+2. **every motif as its own alpha-cut PNG**, ready for Clearcoat;
+3. the **palette** the render actually used, as hex swatches you click to copy;
+4. a **manifest and a zip** so the whole thing travels as one file.
+
+Known themes (Day of the Dead, Remembrance, Japanese, Halloween, Cosmic,
+Holiday, Pride, Tactical) fill the motif list; anything else gets three generic
+lines to rewrite. The list is editable before anything is generated.
+
+Two things are deliberate. **Lettering is never generated**: diffusion melts it,
+so the local render reserves a blank white door panel and the real wordmark is
+dropped in as a file and shipped through the pack untouched. With the GPT
+Image 2 engine the team name is asked for outright, since that model writes
+text legibly. And **the render is a pitch image, not a paint file**: it shows one
+side of a 3D car, the template is a flattened UV sheet, and there is no honest
+projection between them without the car's mesh. Placement stays in Clearcoat.
+
+Measured on the first run (local FLUX, 4 motifs, 1408×1024 render): about five
+minutes total. The corner flood-fill cutout leaves a backdrop disc behind when
+the model paints the subject on a coloured circle, and "papel picado banner"
+came back as another skull — both prompt-side fixes, not pipeline ones.
 
 ## Value range, and why it is the number that matters
 
