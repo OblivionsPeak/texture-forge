@@ -365,7 +365,10 @@ def _build(job, body):
     assets = []
     for i, m in enumerate(motifs):
         _set(job, step=f"motif {i + 1}/{len(motifs)}: {m}")
-        pos, neg = prompts.compile_single(m, style, palette_hint)
+        # "photo realistic X" under the Vinyl style fought itself: the style
+        # wrapper asked for flat vector art and won. Let the subject decide.
+        st = "photo" if ("photo" in m.lower() or "realistic" in m.lower()) else style
+        pos, neg = prompts.compile_single(m, st, palette_hint)
         seed = seed0 + i + 1
         src = providers.generate(provider, prompt=pos, negative=neg, width=1024, height=1024,
                                  seed=seed, steps=steps, guidance=3.5, quality=quality,

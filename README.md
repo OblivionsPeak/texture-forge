@@ -168,6 +168,14 @@ minutes total. The corner flood-fill cutout leaves a backdrop disc behind when
 the model paints the subject on a coloured circle, and "papel picado banner"
 came back as another skull — both prompt-side fixes, not pipeline ones.
 
+Two later fixes. "Photo realistic X" under the Vinyl style fought itself — the
+style wrapper asked for flat vector art and won — so a subject that says photo
+or realistic now takes the Photo style. And sticker-style subjects come with a
+pale outline plus a tinted shadow that the flood fill stops at; the cutout now
+samples the rim colour where the subject meets the background and peels
+inward while pixels stay pale, so the decal lands on a dark panel without a
+white halo. A marigold's orange edge fails the paleness test and is left alone.
+
 ## Painting the real template
 
 The **Paint** tab is the step ChatGPT cannot do: a finished paint sheet for a
@@ -187,10 +195,17 @@ Checked on four kits (992 GT3 R, M4 GT4, AMG GT3 2020, Dallara P217): all four
 yielded 8–11 sponsor zones and 3–6 number zones. A kit with no block layers
 falls back to flat areas found from the curvature map.
 
-**Pick a base.** *Kontext* sends the clean shaded sheet to FLUX Kontext dev with
-the brief and it paints straight onto the sheet, panel by panel, keeping every
-part where the template put it — about 75 s on the 5070. *Texture* stretches or
-tiles anything from the Textures tab. *Colour* is a flat fill.
+**Pick a base.** *GPT Image 2* is the one that works: the clean sheet goes to
+the cloud edit model as image one and the concept pack's render as image two,
+with the instruction to reproduce that design on the sheet. It put the skull on
+the door, the marigold on the fender and the papel picado along the wing, with
+0.6% of painted pixels outside the mask and 84% of the mask boundary landing
+on an edge in the output. Cloud, paid (about $0.20 at 1024). *Kontext* is the
+local equivalent and, measured honestly, does not understand the car: it fills
+each panel with pattern centred on that panel, and given the render as a second
+reference it draws the flowers and throws the sheet layout away. Kept, labelled.
+*Texture* stretches or tiles anything from the Textures tab. *Colour* is a flat
+fill.
 
 **Add a concept pack and a number.** The wordmark lands on the two flattest wide
 sponsor zones, motifs fill the rest, the number is rendered into every number
@@ -200,9 +215,13 @@ zone. Placements on curved zones are flagged.
 shaded preview. The template still cannot say which panel edges meet in 3D, so
 seams are checked in the sim, not here.
 
-Feeding Kontext the composite (with the faint mesh and the kit's decals) made it
-paint the mesh lines and the Porsche crest into the livery. The clean sheet —
-body layer only, dead space dark — fixed it in one run. Kontext ships as a split
+Feeding an edit model the composite (with the faint mesh and the kit's decals)
+made it paint the mesh lines and the Porsche crest into the livery. The clean
+sheet — body layer only, dead space dark — fixed that in one run.
+
+That is also the answer to how the commercial "paint your real template" tools
+most plausibly work: a hosted edit model with the flattened sheet as input,
+priced per render into credits. Nothing about it needs a custom model. Kontext ships as a split
 UNet (`flux1-dev-kontext_fp8_scaled.safetensors`, 11.9 GB) and shares the FLUX
 dev text encoders and VAE.
 

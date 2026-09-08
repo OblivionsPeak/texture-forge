@@ -85,15 +85,28 @@
 
       <h2>Base</h2>
       <div class="modes" id="pBaseMode">
-        <button data-m="kontext" class="on">Kontext</button>
+        <button data-m="gpt" class="on">GPT Image 2</button>
+        <button data-m="kontext">Kontext</button>
         <button data-m="texture">Texture</button>
         <button data-m="color">Colour</button>
       </div>
-      <div id="pKontextBox">
+      <div id="pBriefBox">
         <input id="pBrief" type="text" placeholder="Day of the Dead, inspired by Operation Motorsport" autocomplete="off">
         <label class="row" style="margin-top:8px"><span>Colours</span><input id="pPalette" type="text" placeholder="black with orange, magenta, violet"></label>
+      </div>
+      <div id="pGptBox">
+        <label class="row"><span>Size</span>
+          <select id="pGptSize">
+            <option value="1024x1024">1024 — ~$0.20</option>
+            <option value="1536x1536">1536 — ~$0.45</option>
+            <option value="2048x2048">2048 — ~$0.80</option>
+          </select></label>
+        <label class="chk"><input id="pUseRender" type="checkbox" checked> Copy the concept pack's render onto the sheet</label>
+        <p class="tip">Cloud, paid, sends the sheet and the render to OpenAI. This is the route that puts the skull on the door: with the render as reference it reproduces the design panel by panel. Without a pack it designs from the brief alone.</p>
+      </div>
+      <div id="pKontextBox" class="hidden">
         <label class="row"><span>Guidance</span><input id="pGuidance" type="range" min="1.5" max="4" step="0.1" value="2.5"></label>
-        <p class="tip" id="pKontextNote">FLUX Kontext paints the design straight onto the flattened sheet, panel by panel. About a minute.</p>
+        <p class="tip" id="pKontextNote">Local and free, but honest warning: Kontext fills each panel with pattern and does not understand the car. Expect texture, not a design.</p>
       </div>
       <div id="pTextureBox" class="hidden">
         <select id="pTexture"></select>

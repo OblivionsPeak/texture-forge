@@ -162,6 +162,56 @@ def generate_openai(prompt, negative, width, height, seed=None, quality="high",
     return path
 
 
+def edit_openai(images, prompt, size="1024x1024", quality="high"):
+    """gpt-image-2 image edit: one or more input images plus an instruction.
+
+    This is the call that paints a livery onto a real template. The first
+    image is the flattened sheet, the second (optional) the concept render to
+    copy. Text-only prompting of a local edit model produced marbled texture
+    per panel; this route put the skull on the door. Costs per image.
+    """
+    key = api_key("openai_api_key")
+    if not key:
+        raise RuntimeError("No OpenAI API key set. Add one in the Setup tab.")
+    import uuid
+    b = "----texforge" + uuid.uuid4().hex
+
+    def part(name, val, fname=None, ctype=None):
+        h = f'--{b}\r\nContent-Disposition: form-data; name="{name}"'
+        if fname:
+            h += f'; filename="{fname}"\r\nContent-Type: {ctype}'
+        return h.encode() + b"\r\n\r\n" + (val if isinstance(val, bytes) else val.encode()) + b"\r\n"
+
+    body = part("model", "gpt-image-2") + part("prompt", prompt) + part("size", size) + part("quality", quality)
+    for i, p in enumerate(images):
+        p = Path(p)
+        body += part("image[]", p.read_bytes(), f"ref{i}{p.suffix}", "image/png")
+    body += f"--{b}--\r\n".encode()
+    req = urllib.request.Request(
+        "https://api.openai.com/v1/images/edits", data=body,
+        headers={"Authorization": f"Bearer {key}", "Content-Type": f"multipart/form-data; boundary={b}"})
+    try:
+        with urllib.request.urlopen(req, timeout=600) as r:
+            payload = json.loads(r.read())
+    except urllib.error.HTTPError as e:
+        detail = e.read().decode("utf-8", "replace")
+        try:
+            detail = json.loads(detail)["error"]["message"]
+        except Exception:
+            detail = detail[:300]
+        raise RuntimeError(f"OpenAI error {e.code}: {detail}")
+    item = (payload.get("data") or [{}])[0]
+    if not item.get("b64_json"):
+        raise RuntimeError("OpenAI returned no image data")
+    OUT_DIR.mkdir(exist_ok=True)
+    path = OUT_DIR / f"_openai_edit_{int(time.time())}.png"
+    path.write_bytes(base64.b64decode(item["b64_json"]))
+    usage = payload.get("usage") or {}
+    if usage:
+        print(f"  gpt-image-2 edit usage: {usage}")
+    return path
+
+
 def test_openai():
     """Cheap credential check - lists models rather than buying an image."""
     key = api_key("openai_api_key")

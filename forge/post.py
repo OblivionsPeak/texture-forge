@@ -191,12 +191,61 @@ def cutout(img, tolerance=38, feather=1.0, min_bg_frac=0.02):
     if frac < min_bg_frac:
         return img.convert("RGBA"), 0.0        # nothing meaningful to remove
 
+    keep = _strip_halo(rgb, keep)
     alpha = np.where(keep, 0, 255).astype(np.uint8)
     out = Image.fromarray(np.dstack([np.asarray(img.convert("RGB")), alpha]), "RGBA")
     if feather > 0:
         a = out.getchannel("A").filter(ImageFilter.GaussianBlur(feather))
         out.putalpha(a)
     return out, frac
+
+
+def _ring(cur):
+    r = np.zeros_like(cur)
+    r[1:, :] |= cur[:-1, :]
+    r[:-1, :] |= cur[1:, :]
+    r[:, 1:] |= cur[:, :-1]
+    r[:, :-1] |= cur[:, 1:]
+    return r & ~cur
+
+
+def _strip_halo(rgb, removed, max_depth=18, tol=70, min_lum=115, max_chroma=90):
+    """Peel a sticker border off the subject.
+
+    FLUX draws "sticker" subjects with a pale outline (white, cream, tan, with
+    a soft shadow) between the background and the artwork. The flood fill
+    stops at it, so the decal lands on a dark panel wearing a rim. The rim's
+    colour is not known in advance, so it is sampled: the median colour of the
+    first ring of kept pixels touching the background. If that colour is pale
+    and low-chroma it is a border, and pixels close to it are peeled inward
+    ring by ring, up to max_depth. A subject whose edge is a real colour (an
+    orange marigold) fails the paleness test and is left alone.
+    """
+    first = _ring(removed)
+    if first.sum() < 50:
+        return removed
+    ref = np.median(rgb[first], axis=0)
+    lum, chroma = ref.mean(), ref.max() - ref.min()
+    if lum < min_lum or chroma > max_chroma:
+        return removed
+    # Close to the sampled rim colour, OR plainly pale: sticker borders are a
+    # white line plus a tinted shadow, and the median lands on one of them.
+    plum = rgb.mean(axis=2)
+    pchroma = rgb.max(axis=2) - rgb.min(axis=2)
+    near_ref = np.abs(rgb - ref).sum(axis=2) <= tol
+    pale = (plum >= 185) & (pchroma <= 50)
+    cur = removed.copy()
+    for depth in range(max_depth):
+        # The pale rule is only trusted for the outer rings (the white line and
+        # the anti-aliased fringe); deeper in, only the sampled rim colour
+        # counts, so a light-grey subject is not eaten.
+        allowed = near_ref | pale if depth < 4 else near_ref
+        new = _ring(cur) & allowed
+        if not new.any():
+            break
+        cur |= new
+    # Feather-in one ring of whatever is left so the shadow fringe softens.
+    return cur
 
 
 def trim_to_subject(img, pad=0.04):

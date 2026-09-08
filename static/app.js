@@ -634,7 +634,7 @@ $('#btnConcept').onclick = async () => {
 
 /* ---------------------------------------------------------------- paint */
 
-const P = { base: 'kontext', templates: [], packs: [], textures: [], kontext: false, job: null, timer: null };
+const P = { base: 'gpt', templates: [], packs: [], textures: [], kontext: false, job: null, timer: null };
 
 async function loadPaintLists() {
   try {
@@ -683,9 +683,14 @@ $$('#pBaseMode button').forEach((b) => {
   b.onclick = () => {
     P.base = b.dataset.m;
     $$('#pBaseMode button').forEach((x) => x.classList.toggle('on', x === b));
+    $('#pBriefBox').classList.toggle('hidden', P.base !== 'kontext' && P.base !== 'gpt');
+    $('#pGptBox').classList.toggle('hidden', P.base !== 'gpt');
     $('#pKontextBox').classList.toggle('hidden', P.base !== 'kontext');
     $('#pTextureBox').classList.toggle('hidden', P.base !== 'texture');
     $('#pColorBox').classList.toggle('hidden', P.base !== 'color');
+    // The cloud painter already places the motifs; stacking cut-outs on top
+    // doubles them up. Wordmark and number still go on.
+    if (P.base === 'gpt') $('#pUseMotifs').checked = false;
   };
 });
 
@@ -746,6 +751,7 @@ function paintBlock(j) {
       <a href="${r.spec_tga}" download><button>car_spec.tga</button></a>
       <a href="${r.paint}" download><button>paint.png</button></a>
     </div>
+    ${j.prompt ? `<div class="prompt-peek"><b>Prompt sent:</b> ${esc(j.prompt)}</div>` : ''}
     <p class="meta">Seed ${r.seed}. Rename the TGAs to <code>car_&lt;your iRacing ID&gt;.tga</code> and <code>car_spec_&lt;id&gt;.tga</code> in the car's paint folder, or load paint.png in Clearcoat to keep editing.</p>
   </div>`;
 }
@@ -762,6 +768,7 @@ $('#btnPaint').onclick = async () => {
       base: P.base,
       brief: $('#pBrief').value, palette_hint: $('#pPalette').value,
       guidance: +$('#pGuidance').value,
+      gpt_size: $('#pGptSize').value, use_render: $('#pUseRender').checked,
       texture: $('#pTexture').value, texture_mode: $('#pTextureMode').value,
       color: $('#pColor').value,
       pack: $('#pPack').value || null,

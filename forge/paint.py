@@ -226,7 +226,7 @@ import threading
 import uuid
 import zipfile
 
-from . import comfy
+from . import comfy, providers
 
 JOBS = {}
 _LOCK = threading.Lock()
@@ -289,6 +289,24 @@ def kontext_prompt(brief, palette_hint=None):
             f"no wireframe lines, evenly lit, sharp, high contrast.")
 
 
+def gpt_prompt(info, brief, motif_names=None, palette_hint=None, has_render=False):
+    """Instruction for the cloud edit model. The sheet is image 1, the render image 2."""
+    car = info.get("name", "race car")
+    motifs = ""
+    if motif_names:
+        motifs = " The design features " + ", ".join(m for m in motif_names[:6]) + "."
+    pal = f" Colour scheme: {palette_hint}." if palette_hint else ""
+    ref = (" The second image is the target livery design on the same car: reproduce that design "
+           "on the sheet so it would look like the reference once wrapped onto the car."
+           if has_render else "")
+    return (f"The first image is a flat UV paint template sheet for a {car}: every grey shape is a body "
+            f"panel laid flat. Paint a complete racing livery inspired by {brief} onto the sheet."
+            f"{ref}{motifs}{pal} Place the main artwork on the large panels (doors, hood, roof, rear "
+            f"wing) and let it flow across them; smaller parts get the base colour. Keep every panel "
+            f"shape exactly where it is on the sheet, keep the dark background between panels. "
+            f"Flat 2D artwork, no perspective, no text, no letters, no logos, no numbers.")
+
+
 def start(body):
     job = {"id": uuid.uuid4().hex[:10], "done": False, "error": None, "step": "queued",
            "progress": 0, "total": 3, "result": None, "log": []}
@@ -333,6 +351,36 @@ def _build(job, body):
             raise RuntimeError(err)
         base = Image.open(files[0]).convert("RGB").resize(size, Image.LANCZOS)
         job["log"].append("kontext base done")
+    elif base_mode == "gpt":
+        brief = (body.get("brief") or "").strip()
+        if not brief:
+            raise ValueError("the cloud painter needs a brief")
+        tdir = T.TEMPLATES_DIR / info["slug"]
+        src = tdir / "clean.png"
+        if not src.exists():
+            src = tdir / "flat.png"
+        images = [src]
+        motif_names = []
+        pack = body.get("pack")
+        if pack:
+            d = OUT_DIR / Path(pack).name
+            man = {}
+            try:
+                man = json.loads((d / "manifest.json").read_text("utf-8"))
+            except Exception:
+                pass
+            motif_names = [a.get("subject") for a in man.get("assets", []) if a.get("subject")]
+            if body.get("use_render", True) and (d / "render.png").exists():
+                images.append(d / "render.png")
+        gsize = body.get("gpt_size", "1024x1024")
+        if gsize not in ("1024x1024", "1536x1536", "2048x2048"):
+            gsize = "1024x1024"
+        _set(job, step=f"GPT Image 2 is painting the sheet at {gsize} (cloud, paid, about a minute)")
+        prompt = gpt_prompt(info, brief, motif_names, body.get("palette_hint"), len(images) > 1)
+        out = providers.edit_openai(images, prompt, size=gsize, quality=body.get("quality", "high"))
+        base = Image.open(out).convert("RGB").resize(size, Image.LANCZOS)
+        job["log"].append(f"gpt base done, {len(images)} reference image(s)")
+        job["prompt"] = prompt
     elif base_mode == "texture":
         f = body.get("texture")
         if not f:
@@ -374,6 +422,11 @@ def _build(job, body):
     _set(job, step="exporting")
     folder, files = export(info, sheet, stem)
     (folder / "placements.json").write_text(json.dumps(log, indent=1), "utf-8")
+    (folder / "manifest.json").write_text(json.dumps({
+        "template": info["slug"], "base": base_mode, "brief": body.get("brief"),
+        "palette_hint": body.get("palette_hint"), "pack": body.get("pack"),
+        "number": body.get("number"), "seed": seed, "prompt": job.get("prompt"),
+    }, indent=1), "utf-8")
     zpath = OUT_DIR / f"{stem}.zip"
     with zipfile.ZipFile(zpath, "w", zipfile.ZIP_DEFLATED) as z:
         for p in sorted(folder.iterdir()):

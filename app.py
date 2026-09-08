@@ -331,6 +331,8 @@ def packs_list():
 @app.route("/api/paint/start", methods=["POST"])
 def paint_start():
     body = request.get_json(force=True) or {}
+    if body.get("base") == "gpt" and not providers.api_key("openai_api_key"):
+        return jsonify({"ok": False, "error": "No OpenAI key set. Add one in the Setup tab."}), 409
     if body.get("base") == "kontext":
         if not comfy.kontext_ready():
             return jsonify({"ok": False, "error": "The Kontext model is not installed yet."}), 409

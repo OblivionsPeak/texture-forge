@@ -353,7 +353,14 @@ SUBJECT_STYLES = {
         "name": "Vinyl cut",
         "hint": "Flat vector graphic. Hardest edges, reads best at distance.",
         "wrap": "bold flat vector graphic of {subject}, thick clean outlines, solid "
-                "colour fills, no gradients, no shading, sticker art, high contrast",
+                "colour fills, no gradients, no shading, high contrast, no white border "
+                "or outline around the subject",
+    },
+    "photo": {
+        "name": "Photo",
+        "hint": "Photorealistic object. For real things — a revolver, a helmet, a flower.",
+        "wrap": "photorealistic studio photograph of {subject}, sharp detail, natural "
+                "materials and lighting, product photography, no border around the subject",
     },
     "painted": {
         "name": "Painted",
