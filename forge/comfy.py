@@ -229,6 +229,79 @@ def build_workflow(prompt, negative, width, height, seed, steps=20, guidance=3.5
     }
 
 
+KONTEXT = "flux1-dev-kontext_fp8_scaled.safetensors"
+
+
+def kontext_ready():
+    return (COMFY_DIR / "models" / "diffusion_models" / KONTEXT).exists()
+
+
+def upload_image(path):
+    """Put a file into ComfyUI/input so a LoadImage node can see it."""
+    import mimetypes
+    import uuid
+    path = Path(path)
+    boundary = "----texforge" + uuid.uuid4().hex
+    name = f"texforge_{uuid.uuid4().hex[:8]}{path.suffix.lower()}"
+    ctype = mimetypes.guess_type(str(path))[0] or "application/octet-stream"
+    body = (f"--{boundary}\r\nContent-Disposition: form-data; name=\"image\"; filename=\"{name}\"\r\n"
+            f"Content-Type: {ctype}\r\n\r\n").encode() + path.read_bytes() + \
+           f"\r\n--{boundary}\r\nContent-Disposition: form-data; name=\"overwrite\"\r\n\r\ntrue\r\n--{boundary}--\r\n".encode()
+    req = urllib.request.Request(BASE + "/upload/image", data=body,
+                                 headers={"Content-Type": f"multipart/form-data; boundary={boundary}"})
+    with urllib.request.urlopen(req, timeout=60) as r:
+        return json.loads(r.read())["name"]
+
+
+def build_kontext_workflow(image_name, prompt, seed, steps=20, guidance=2.5):
+    """FLUX Kontext dev: edit an image under instruction.
+
+    The template sheet goes in as the reference latent, so the model paints
+    ON the sheet rather than imagining a car. FluxKontextImageScale resizes
+    to the model's preferred ~1MP; the result is upscaled back afterwards.
+    Kontext ships only as a split UNet, so the text encoders and VAE are the
+    same files the FLUX dev split layout uses.
+    """
+    return {
+        "1": {"class_type": "UNETLoader",
+              "inputs": {"unet_name": KONTEXT, "weight_dtype": "fp8_e4m3fn"}},
+        "2": {"class_type": "DualCLIPLoader",
+              "inputs": {"clip_name1": CLIP_L, "clip_name2": T5, "type": "flux"}},
+        "3": {"class_type": "VAELoader", "inputs": {"vae_name": VAE}},
+        "4": {"class_type": "LoadImage", "inputs": {"image": image_name}},
+        "5": {"class_type": "FluxKontextImageScale", "inputs": {"image": ["4", 0]}},
+        "6": {"class_type": "VAEEncode", "inputs": {"pixels": ["5", 0], "vae": ["3", 0]}},
+        "7": {"class_type": "CLIPTextEncode", "inputs": {"text": prompt, "clip": ["2", 0]}},
+        "8": {"class_type": "ReferenceLatent", "inputs": {"conditioning": ["7", 0], "latent": ["6", 0]}},
+        "9": {"class_type": "FluxGuidance", "inputs": {"conditioning": ["8", 0], "guidance": guidance}},
+        "10": {"class_type": "CLIPTextEncode", "inputs": {"text": "", "clip": ["2", 0]}},
+        "11": {"class_type": "EmptySD3LatentImage",
+               "inputs": {"width": 1024, "height": 1024, "batch_size": 1}},
+        "12": {"class_type": "KSampler",
+               "inputs": {"model": ["1", 0], "positive": ["9", 0], "negative": ["10", 0],
+                          "latent_image": ["6", 0], "seed": seed, "steps": steps,
+                          "cfg": 1.0, "sampler_name": "euler", "scheduler": "simple",
+                          "denoise": 1.0}},
+        "13": {"class_type": "VAEDecode", "inputs": {"samples": ["12", 0], "vae": ["3", 0]}},
+        "14": {"class_type": "SaveImage",
+               "inputs": {"images": ["13", 0], "filename_prefix": "texforge_kontext"}},
+    }
+
+
+def edit(image_path, prompt, seed, steps=20, guidance=2.5, timeout=900):
+    """Kontext round trip: upload, queue, wait. Returns (files, err)."""
+    if not kontext_ready():
+        return None, f"Kontext model missing: models/diffusion_models/{KONTEXT}"
+    try:
+        name = upload_image(image_path)
+    except Exception as e:
+        return None, f"upload failed: {e}"
+    pid, err = queue(build_kontext_workflow(name, prompt, seed, steps, guidance))
+    if err:
+        return None, err
+    return wait_for(pid, timeout=timeout)
+
+
 def queue(workflow):
     body = json.dumps({"prompt": workflow}).encode()
     req = urllib.request.Request(BASE + "/prompt", data=body,

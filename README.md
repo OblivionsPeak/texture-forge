@@ -109,7 +109,7 @@ Every preset here is written for **flat 2D artwork, orthographic, evenly lit,
 no depth of field, no vignette, no text**. That single change is the difference
 between a nice picture and a usable texture.
 
-## Five tabs
+## Six tabs
 
 **Textures** — two ways in.
 
@@ -167,6 +167,50 @@ Measured on the first run (local FLUX, 4 motifs, 1408×1024 render): about five
 minutes total. The corner flood-fill cutout leaves a backdrop disc behind when
 the model paints the subject on a coloured circle, and "papel picado banner"
 came back as another skull — both prompt-side fixes, not pipeline ones.
+
+## Painting the real template
+
+The **Paint** tab is the step ChatGPT cannot do: a finished paint sheet for a
+specific iRacing car, exported as TGA. Nothing is traced by hand.
+
+**Drop in the car's paint-kit PSD.** Four hidden layers inside every kit carry
+what a generator needs, and they are read raw (they ship switched off):
+
+| Layer | What it gives |
+|---|---|
+| `Mask` | the paintable area (inverted: the layer marks dead space) |
+| `Wire` | the polygon mesh — its density is a free curvature map |
+| `Sponsor Blocks` / `Sponsor` | where iRacing's artists say a sponsor decal sits flat |
+| `Number Blocks` / `Numbers` | where the race number goes |
+
+Checked on four kits (992 GT3 R, M4 GT4, AMG GT3 2020, Dallara P217): all four
+yielded 8–11 sponsor zones and 3–6 number zones. A kit with no block layers
+falls back to flat areas found from the curvature map.
+
+**Pick a base.** *Kontext* sends the clean shaded sheet to FLUX Kontext dev with
+the brief and it paints straight onto the sheet, panel by panel, keeping every
+part where the template put it — about 75 s on the 5070. *Texture* stretches or
+tiles anything from the Textures tab. *Colour* is a flat fill.
+
+**Add a concept pack and a number.** The wordmark lands on the two flattest wide
+sponsor zones, motifs fill the rest, the number is rendered into every number
+zone. Placements on curved zones are flagged.
+
+**Export.** `car.tga`, a derived `car_spec.tga`, `paint.png` for Clearcoat, and a
+shaded preview. The template still cannot say which panel edges meet in 3D, so
+seams are checked in the sim, not here.
+
+Feeding Kontext the composite (with the faint mesh and the kit's decals) made it
+paint the mesh lines and the Porsche crest into the livery. The clean sheet —
+body layer only, dead space dark — fixed it in one run. Kontext ships as a split
+UNet (`flux1-dev-kontext_fp8_scaled.safetensors`, 11.9 GB) and shares the FLUX
+dev text encoders and VAE.
+
+**Windows lets two servers bind port 4796 at once**, after which requests are
+split between old and new code at random. That presented as "the new tab 404s"
+and "auto-fill stopped working". The app now refuses to start if something
+already answers on the port, and the launcher reinstalls dependencies whenever
+`requirements.txt` changes.
 
 ## Value range, and why it is the number that matters
 

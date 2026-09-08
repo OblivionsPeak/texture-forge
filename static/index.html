@@ -26,6 +26,7 @@
 
 <nav class="tabs">
   <button data-tab="concept">Concept</button>
+  <button data-tab="paint">Paint</button>
   <button data-tab="texture" class="on">Textures</button>
   <button data-tab="shape">Silhouettes</button>
   <button data-tab="check">Squint check</button>
@@ -69,6 +70,59 @@
     <div class="stage">
       <div id="conceptResult" class="result empty">
         <p>Write a brief and build. You get a side-profile studio render to pitch with, every motif as its own alpha-cut PNG, the palette as hex, and a zip of the lot. Placement still happens in Clearcoat on the real template — the render is a pitch image, not a paint file.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== PAINT ===================== -->
+  <section id="tab-paint" class="tab">
+    <aside class="panel">
+      <h2>Car template</h2>
+      <select id="pTemplate"></select>
+      <input id="pPsd" type="file" accept=".psd,.psb" style="margin-top:8px">
+      <p class="tip">Drop in the .psd from the iRacing paint kit. The mask, the mesh and iRacing's own sponsor and number zones are read from its hidden layers — nothing to trace.</p>
+      <div id="pTemplateInfo" class="tip"></div>
+
+      <h2>Base</h2>
+      <div class="modes" id="pBaseMode">
+        <button data-m="kontext" class="on">Kontext</button>
+        <button data-m="texture">Texture</button>
+        <button data-m="color">Colour</button>
+      </div>
+      <div id="pKontextBox">
+        <input id="pBrief" type="text" placeholder="Day of the Dead, inspired by Operation Motorsport" autocomplete="off">
+        <label class="row" style="margin-top:8px"><span>Colours</span><input id="pPalette" type="text" placeholder="black with orange, magenta, violet"></label>
+        <label class="row"><span>Guidance</span><input id="pGuidance" type="range" min="1.5" max="4" step="0.1" value="2.5"></label>
+        <p class="tip" id="pKontextNote">FLUX Kontext paints the design straight onto the flattened sheet, panel by panel. About a minute.</p>
+      </div>
+      <div id="pTextureBox" class="hidden">
+        <select id="pTexture"></select>
+        <label class="row" style="margin-top:8px"><span>Fit</span>
+          <select id="pTextureMode"><option value="stretch">stretch across sheet</option><option value="tile">tile</option></select></label>
+        <p class="tip">Any texture from the Textures tab. Stretch is right for most; tile for seamless ones.</p>
+      </div>
+      <div id="pColorBox" class="hidden">
+        <label class="row"><span>Hex</span><input id="pColor" type="text" value="#111111"></label>
+      </div>
+
+      <h2>Concept pack <span class="opt">optional</span></h2>
+      <select id="pPack"></select>
+      <div id="pPackPreview" class="tip"></div>
+      <label class="chk" style="margin-top:8px"><input id="pUseMotifs" type="checkbox" checked> Place motifs in sponsor zones</label>
+      <label class="chk"><input id="pUseWordmark" type="checkbox" checked> Place wordmark on the flattest wide zones</label>
+
+      <h2>Number <span class="opt">optional</span></h2>
+      <label class="row"><span>Number</span><input id="pNumber" type="text" placeholder="22"></label>
+      <label class="row"><span>Fill / edge</span><input id="pNumColor" type="text" value="#ffffff" style="max-width:90px"><input id="pNumOutline" type="text" value="#000000" style="max-width:90px"></label>
+
+      <label class="row" style="margin-top:12px"><span>Seed</span><input id="pSeed" type="number" placeholder="random"></label>
+      <button id="btnPaint" class="primary big">Paint the template</button>
+      <p class="tip" id="pNote"></p>
+    </aside>
+
+    <div class="stage">
+      <div id="paintResult" class="result empty">
+        <p>Pick a template, choose a base, optionally a concept pack and a number, then paint. You get the paint sheet, a derived spec map, a shaded preview and TGA files ready for <code>Documents\iRacing\paint\&lt;car&gt;\</code>. Check seams in the sim — the template cannot tell which panel edges meet.</p>
       </div>
     </div>
   </section>

@@ -39,7 +39,10 @@ set "VPY=.venv\Scripts\python.exe"
 
 REM Marker file rather than reinstalling every launch - pip is slow enough that
 REM a few seconds on every start is noticeable.
-if not exist ".venv\.deps-ok" (
+REM The marker is a copy of requirements.txt, so editing that file (a new
+REM dependency) triggers one reinstall instead of being silently ignored.
+fc /b requirements.txt ".venv\.deps-ok" >nul 2>&1
+if errorlevel 1 (
   echo   Installing dependencies, one moment...
   "%VPY%" -m pip install --quiet --upgrade pip
   "%VPY%" -m pip install --quiet -r requirements.txt
@@ -49,7 +52,7 @@ if not exist ".venv\.deps-ok" (
     pause
     exit /b 1
   )
-  echo done > ".venv\.deps-ok"
+  copy /y requirements.txt ".venv\.deps-ok" >nul
 )
 
 echo   Starting...

@@ -144,6 +144,7 @@ textarea:focus{border-color:var(--accent)}
 .motifs figure.pending{opacity:.45}
 .motifs figure.pending img{background:var(--panel2)}
 .steps{font-size:12px; color:var(--mute); line-height:1.6}
+.checkerbg{background:repeating-conic-gradient(#2a2f3a 0 25%,#20242c 0 50%) 0 0/22px 22px}
 .steps b{color:var(--ink); font-weight:600}
 
 /* free-form mode toggle */

@@ -463,7 +463,7 @@ function applyTexMode() {
 
 /* -------------------------------------------------------------- concept */
 
-const C = { style: 'vinyl', provider: 'local', wordmark: null, job: null, timer: null, suggestTimer: null };
+const C = { style: 'vinyl', provider: 'local', wordmark: null, job: null, timer: null, suggestTimer: null, lastTheme: null };
 
 function renderConceptStyles() {
   const box = $('#cStyles');
@@ -503,7 +503,7 @@ function conceptProvNote() {
     : 'Local FLUX leaves a blank white panel where the team name goes; the wordmark ships separately. Roughly 40s per image.';
 }
 
-async function conceptSuggest() {
+async function conceptSuggest(force) {
   const brief = $('#cBrief').value.trim();
   try {
     const r = await api('/api/concept/suggest', { brief });
@@ -512,16 +512,22 @@ async function conceptSuggest() {
     }
     if (!brief) { $('#cSuggest').textContent = ''; return; }
     const ta = $('#cMotifs');
-    // Only overwrite the motif box if the user hasn't typed their own list.
-    if (!ta.value.trim() || ta.dataset.auto === '1') {
+    // Refill when the box is untouched OR the brief now points at a different
+    // theme. Editing the list once used to freeze it for every later brief,
+    // which read as "auto-fill stopped working".
+    const themeKey = r.theme || '(generic)';
+    if (force || !ta.value.trim() || ta.dataset.auto === '1' || C.lastTheme !== themeKey) {
       ta.value = r.motifs.join('\n');
       ta.dataset.auto = '1';
     }
+    C.lastTheme = themeKey;
     if (r.palette_hint && !$('#cPalette').value.trim()) $('#cPalette').placeholder = r.palette_hint;
     if (r.style) { C.style = r.style; renderConceptStyles(); }
-    $('#cSuggest').textContent = r.theme
-      ? `Recognised as "${r.theme}" — motif list filled in. Edit it freely.`
-      : 'No known theme matched. Replace the three generic lines with the motifs you want.';
+    $('#cSuggest').innerHTML = (r.theme
+      ? `Recognised as "${esc(r.theme)}" — motif list filled in. Edit it freely.`
+      : 'No known theme matched. Replace the three generic lines with the motifs you want.')
+      + ' <a href="#" id="cRefill">Refill from brief</a>';
+    $('#cRefill').onclick = (e) => { e.preventDefault(); conceptSuggest(true); };
   } catch (e) { /* suggestion is a convenience */ }
 }
 
@@ -625,6 +631,165 @@ $('#btnConcept').onclick = async () => {
     busy(false);
   }
 };
+
+/* ---------------------------------------------------------------- paint */
+
+const P = { base: 'kontext', templates: [], packs: [], textures: [], kontext: false, job: null, timer: null };
+
+async function loadPaintLists() {
+  try {
+    const t = await (await fetch('/api/templates')).json();
+    P.templates = t.templates || [];
+    P.kontext = !!t.kontext_ready;
+    const cur = $('#pTemplate').value;
+    $('#pTemplate').innerHTML = P.templates.length
+      ? P.templates.map((x) => `<option value="${x.slug}">${esc(x.name)} · ${x.sponsor_blocks} sponsor / ${x.number_blocks} number zones</option>`).join('')
+      : '<option value="">— no template ingested yet —</option>';
+    if (cur && P.templates.some((x) => x.slug === cur)) $('#pTemplate').value = cur;
+    paintTemplateInfo();
+    $('#pKontextNote').textContent = P.kontext
+      ? 'FLUX Kontext paints the design straight onto the flattened sheet, panel by panel. About a minute.'
+      : 'Kontext model not installed: models/diffusion_models/flux1-dev-kontext_fp8_scaled.safetensors. Use Texture or Colour until then.';
+  } catch (e) { /* lists are a convenience */ }
+  try {
+    const p = await (await fetch('/api/packs')).json();
+    P.packs = p.packs || []; P.textures = p.textures || [];
+    $('#pPack').innerHTML = '<option value="">— none —</option>' + P.packs.map((k) =>
+      `<option value="${k.id}">${esc(k.brief.slice(0, 60))} (${k.motifs.length} motifs${k.wordmark ? ' + wordmark' : ''})</option>`).join('');
+    $('#pTexture').innerHTML = P.textures.map((x) => `<option value="${x.file}">${esc(x.file)}</option>`).join('');
+    paintPackPreview();
+  } catch (e) { /* same */ }
+}
+
+function paintTemplateInfo() {
+  const t = P.templates.find((x) => x.slug === $('#pTemplate').value);
+  $('#pTemplateInfo').textContent = t
+    ? `${t.size[0]}×${t.size[1]} · ${Math.round(t.paintable * 100)}% paintable · ${t.has_wire ? 'mesh found' : 'no mesh layer'}`
+    : '';
+}
+
+function paintPackPreview() {
+  const k = P.packs.find((x) => x.id === $('#pPack').value);
+  $('#pPackPreview').innerHTML = k
+    ? `<div class="swatches" style="margin-top:6px">${k.motifs.map((u) => `<img src="${u}" style="width:44px;height:44px;object-fit:contain;border-radius:6px;background:repeating-conic-gradient(#2a2f3a 0 25%,#20242c 0 50%) 0 0/11px 11px">`).join('')}${k.wordmark ? `<img src="${k.wordmark}" style="height:44px;object-fit:contain;border-radius:6px;background:#333">` : ''}</div>`
+    : '';
+  if (k && !$('#pBrief').value.trim()) $('#pBrief').value = k.brief;
+}
+
+$('#pTemplate').onchange = paintTemplateInfo;
+$('#pPack').onchange = paintPackPreview;
+
+$$('#pBaseMode button').forEach((b) => {
+  b.onclick = () => {
+    P.base = b.dataset.m;
+    $$('#pBaseMode button').forEach((x) => x.classList.toggle('on', x === b));
+    $('#pKontextBox').classList.toggle('hidden', P.base !== 'kontext');
+    $('#pTextureBox').classList.toggle('hidden', P.base !== 'texture');
+    $('#pColorBox').classList.toggle('hidden', P.base !== 'color');
+  };
+});
+
+$('#pPsd').addEventListener('change', async () => {
+  const f = $('#pPsd').files[0];
+  if (!f) return;
+  const el = $('#paintResult');
+  el.classList.remove('empty');
+  busy(true, el, `Reading ${f.name} — a paint kit PSD takes a few seconds…`);
+  try {
+    const fd = new FormData();
+    fd.append('psd', f);
+    const r = await api('/api/templates/ingest', fd, true);
+    await loadPaintLists();
+    $('#pTemplate').value = r.slug;
+    paintTemplateInfo();
+    el.innerHTML = templateBlock(r);
+    toast(`${r.name}: ${r.sponsor_blocks} sponsor zones, ${r.number_blocks} number zones${r.blocks_auto ? ' (found automatically — this kit has no block layers)' : ''}.`);
+  } catch (e) {
+    el.innerHTML = `<p style="color:var(--bad);max-width:52ch">${esc(e.message)}</p>`;
+    toast(e.message, true);
+  }
+  busy(false);
+  $('#pPsd').value = '';
+});
+
+function templateBlock(r) {
+  const s = r.size[0];
+  const rects = (r.blocks || []).map((b) =>
+    `<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" fill="${b.kind === 'number' ? 'rgba(0,200,255,.45)' : 'rgba(255,140,0,.45)'}" stroke="${b.kind === 'number' ? '#3cf' : '#fa0'}" stroke-width="3"><title>${b.id} · curvature ${b.curvature}</title></rect>`).join('');
+  return `<div class="pack">
+    <div class="verdict good"><b>${esc(r.name)}</b> — ${r.sponsor_blocks} sponsor zones (orange), ${r.number_blocks} number zones (blue)${r.blocks_auto ? '. No block layers in this kit, so zones were found from flat areas of the mesh.' : ', read from iRacing\'s own hidden block layers.'}</div>
+    <div class="hero" style="position:relative">
+      <img src="/out/templates/${r.slug}/guide.png?t=${Date.now()}" alt="template" style="width:100%">
+      <svg viewBox="0 0 ${s} ${r.size[1]}" style="position:absolute;inset:0;width:100%;height:100%">${rects}</svg>
+    </div></div>`;
+}
+
+function paintBlock(j) {
+  const r = j.result;
+  const pct = j.total ? Math.round(100 * j.progress / j.total) : 0;
+  if (j.error) return `<div class="pack"><div class="verdict bad"><b>Failed</b> — ${esc(j.error)}</div></div>`;
+  if (!j.done) return `<div class="pack"><div class="bar-out"><div class="bar-in" style="width:${pct}%"></div></div>
+    <p class="steps"><span class="spin" style="display:inline-block;width:12px;height:12px;vertical-align:middle;margin-right:8px"></span><b>${esc(j.step)}</b></p></div>`;
+  const warn = r.warnings && r.warnings.length
+    ? `<div class="verdict bad"><b>Check in the sim</b> — ${r.warnings.map(esc).join('; ')}</div>` : '';
+  return `<div class="pack">
+    <div class="verdict good"><b>Painted</b> — ${r.placements.length} placements. Saved to <code>out/${esc(r.folder)}/</code></div>
+    ${warn}
+    <div class="hero"><img src="${r.preview}?t=${r.seed}" alt="preview"><p class="meta" style="margin-top:6px">Shaded preview · flat sheet with the kit's own shading</p></div>
+    <div class="pair">
+      <figure><img src="${r.paint}?t=${r.seed}" alt="paint" class="checkerbg"><figcaption>paint.png — what ships as car.tga</figcaption></figure>
+      <figure><img src="${r.spec}?t=${r.seed}" alt="spec"><figcaption>spec map — derived, not painted</figcaption></figure>
+    </div>
+    <div class="acts">
+      <a href="${r.zip}" download><button class="primary">Download all (.zip)</button></a>
+      <a href="${r.tga}" download><button>car.tga</button></a>
+      <a href="${r.spec_tga}" download><button>car_spec.tga</button></a>
+      <a href="${r.paint}" download><button>paint.png</button></a>
+    </div>
+    <p class="meta">Seed ${r.seed}. Rename the TGAs to <code>car_&lt;your iRacing ID&gt;.tga</code> and <code>car_spec_&lt;id&gt;.tga</code> in the car's paint folder, or load paint.png in Clearcoat to keep editing.</p>
+  </div>`;
+}
+
+$('#btnPaint').onclick = async () => {
+  if (STATE.busy) return;
+  if (!$('#pTemplate').value) { toast('Ingest a template first.', true); return; }
+  const el = $('#paintResult');
+  el.classList.remove('empty');
+  busy(true, el, 'Starting…');
+  try {
+    const r = await api('/api/paint/start', {
+      template: $('#pTemplate').value,
+      base: P.base,
+      brief: $('#pBrief').value, palette_hint: $('#pPalette').value,
+      guidance: +$('#pGuidance').value,
+      texture: $('#pTexture').value, texture_mode: $('#pTextureMode').value,
+      color: $('#pColor').value,
+      pack: $('#pPack').value || null,
+      use_motifs: $('#pUseMotifs').checked, use_wordmark: $('#pUseWordmark').checked,
+      number: $('#pNumber').value, number_color: $('#pNumColor').value, number_outline: $('#pNumOutline').value,
+      seed: $('#pSeed').value ? +$('#pSeed').value : null,
+    });
+    P.job = r.job;
+    const poll = async () => {
+      let j;
+      try { j = await (await fetch('/api/paint/job/' + P.job)).json(); }
+      catch (e) { P.timer = setTimeout(poll, 2000); return; }
+      el.innerHTML = paintBlock(j);
+      if (j.done) { busy(false); toast(j.error ? j.error : 'Painted.', !!j.error); }
+      else P.timer = setTimeout(poll, 2000);
+    };
+    poll();
+  } catch (e) {
+    el.innerHTML = `<p style="color:var(--bad);max-width:52ch">${esc(e.message)}</p>`;
+    toast(e.message, true);
+    busy(false);
+  }
+};
+
+$$('.tabs button').forEach((b) => {
+  if (b.dataset.tab === 'paint') b.addEventListener('click', () => loadPaintLists());
+});
+loadPaintLists();
 
 const _loadProviders = loadProviders;
 loadProviders = async function () { await _loadProviders(); renderConceptProviders(); };
