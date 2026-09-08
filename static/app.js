@@ -146,7 +146,6 @@ function resultBlock(r, title) {
 
 $('#btnGen').onclick = async () => {
   if (STATE.busy) return;
-  const prov = STATE.providers.find((x) => x.id === STATE.provider);
   const single = STATE.texMode === 'single';
   if (STATE.texMode === 'describe' && !$('#subject').value.trim()) {
     toast('Describe what it is inspired by first.', true); return;
@@ -160,7 +159,7 @@ $('#btnGen').onclick = async () => {
   }
   const el = $('#texResult');
   el.classList.remove('empty');
-  busy(true, el, prov && prov.cloud ? 'Forging via GPT Image 2…' : 'Forging… first run also loads the model, so allow a minute.');
+  busy(true, el, 'Forging… first run also loads the model, so allow a minute.');
   try {
     const describing = STATE.texMode === 'describe';
     const r = await api('/api/generate', {
@@ -170,7 +169,6 @@ $('#btnGen').onclick = async () => {
       style: STATE.style,
       medium: STATE.medium, shape: $('#artShape').value,
       provider: STATE.provider,
-      quality: $('#quality') ? $('#quality').value : 'high',
       freeform: describing,
       treatment: STATE.treatment,
       preset: STATE.preset,
@@ -323,46 +321,13 @@ async function loadProviders() {
   try {
     const d = await (await fetch('/api/providers')).json();
     STATE.providers = d.providers;
-    renderProviders();
+    const p = STATE.providers.find((x) => x.id === STATE.provider) || STATE.providers[0];
+    if (p) {
+      $('#genSize').innerHTML = p.sizes.map((sz, i) =>
+        `<option value="${sz}"${i === 0 ? ' selected' : ''}>${sz} × ${sz}</option>`).join('');
+    }
   } catch (e) { /* engine list is not critical to the rest of the UI */ }
 }
-
-function renderProviders() {
-  $('#providers').innerHTML = STATE.providers.map((p) =>
-    `<button data-id="${p.id}" title="${esc(p.hint)}" class="${p.id === STATE.provider ? 'on' : ''}">
-       <b>${esc(p.name)}</b><i>${p.cloud ? 'cloud · paid' : 'local · free'}</i></button>`).join('');
-  $$('#providers button').forEach((b) => {
-    b.onclick = () => {
-      STATE.provider = b.dataset.id;
-      $$('#providers button').forEach((x) => x.classList.toggle('on', x === b));
-      applyProvider();
-    };
-  });
-  applyProvider();
-}
-
-function applyProvider() {
-  const p = STATE.providers.find((x) => x.id === STATE.provider);
-  if (!p) return;
-  $('#provNote').textContent = p.hint;
-  $('#genSize').innerHTML = p.sizes.map((sz, i) =>
-    `<option value="${sz}"${i === 0 ? ' selected' : ''}>${sz} × ${sz}</option>`).join('');
-  $$('.cloudOnly').forEach((e) => e.classList.toggle('hidden', !p.cloud));
-  $$('.localOnly').forEach((e) => e.classList.toggle('hidden', p.cloud));
-}
-
-$('#btnKey').onclick = async () => {
-  const v = $('#oaiKey').value.trim();
-  if (!v) { toast('Paste a key first.', true); return; }
-  $('#btnKey').disabled = true;
-  try {
-    const r = await api('/api/providers/key', { openai_api_key: v });
-    toast(r.message);
-    $('#oaiKey').value = '';
-    loadProviders();
-  } catch (e) { toast(e.message, true); }
-  $('#btnKey').disabled = false;
-};
 
 /* ---------------------------------------------------------------- setup */
 
@@ -505,30 +470,6 @@ function renderConceptStyles() {
   });
 }
 
-function renderConceptProviders() {
-  const box = $('#cProviders');
-  if (!box || !STATE.providers.length) return;
-  box.innerHTML = STATE.providers.map((p) =>
-    `<button data-id="${p.id}" title="${esc(p.hint)}" class="${p.id === C.provider ? 'on' : ''}">
-       <b>${esc(p.name)}</b><i>${p.cloud ? 'cloud · paid · writes text' : 'local · free · no text'}</i></button>`).join('');
-  $$('#cProviders button').forEach((b) => {
-    b.onclick = () => {
-      C.provider = b.dataset.id;
-      $$('#cProviders button').forEach((x) => x.classList.toggle('on', x === b));
-      conceptProvNote();
-    };
-  });
-  conceptProvNote();
-}
-
-function conceptProvNote() {
-  const p = STATE.providers.find((x) => x.id === C.provider);
-  if (!p) return;
-  $('#cProvNote').textContent = p.cloud
-    ? 'GPT Image 2 can write the team name onto the render legibly. Each motif is a separate paid image.'
-    : 'Local FLUX leaves a blank white panel where the team name goes; the wordmark ships separately. Roughly 40s per image.';
-}
-
 async function conceptSuggest(force) {
   const brief = $('#cBrief').value.trim();
   try {
@@ -632,7 +573,7 @@ $('#btnConcept').onclick = async () => {
     const r = await api('/api/concept/start', {
       brief, team: $('#cTeam').value, car: $('#cCar').value,
       palette_hint: $('#cPalette').value, motifs, style: C.style,
-      provider: C.provider, quality: 'high', steps: 20,
+      provider: 'local', steps: 20,
       render: $('#cRender').checked,
       seed: $('#cSeed').value ? +$('#cSeed').value : null,
       wordmark_file: C.wordmark,
@@ -660,7 +601,7 @@ $('#btnConcept').onclick = async () => {
 
 /* ---------------------------------------------------------------- paint */
 
-const P = { base: 'gpt', templates: [], packs: [], textures: [], kontext: false, job: null, timer: null };
+const P = { base: 'kontext', templates: [], packs: [], textures: [], kontext: false, job: null, timer: null };
 
 async function loadPaintLists() {
   try {
@@ -709,14 +650,10 @@ $$('#pBaseMode button').forEach((b) => {
   b.onclick = () => {
     P.base = b.dataset.m;
     $$('#pBaseMode button').forEach((x) => x.classList.toggle('on', x === b));
-    $('#pBriefBox').classList.toggle('hidden', P.base !== 'kontext' && P.base !== 'gpt');
-    $('#pGptBox').classList.toggle('hidden', P.base !== 'gpt');
+    $('#pBriefBox').classList.toggle('hidden', P.base !== 'kontext');
     $('#pKontextBox').classList.toggle('hidden', P.base !== 'kontext');
     $('#pTextureBox').classList.toggle('hidden', P.base !== 'texture');
     $('#pColorBox').classList.toggle('hidden', P.base !== 'color');
-    // The cloud painter already places the motifs; stacking cut-outs on top
-    // doubles them up. Wordmark and number still go on.
-    if (P.base === 'gpt') $('#pUseMotifs').checked = false;
   };
 });
 
@@ -794,7 +731,6 @@ $('#btnPaint').onclick = async () => {
       base: P.base,
       brief: $('#pBrief').value, palette_hint: $('#pPalette').value,
       guidance: +$('#pGuidance').value,
-      gpt_size: $('#pGptSize').value, use_render: $('#pUseRender').checked,
       texture: $('#pTexture').value, texture_mode: $('#pTextureMode').value,
       color: $('#pColor').value,
       pack: $('#pPack').value || null,
@@ -824,8 +760,6 @@ $$('.tabs button').forEach((b) => {
 });
 loadPaintLists();
 
-const _loadProviders = loadProviders;
-loadProviders = async function () { await _loadProviders(); renderConceptProviders(); };
 const _refreshStatus = refreshStatus;
 refreshStatus = async function () {
   await _refreshStatus();

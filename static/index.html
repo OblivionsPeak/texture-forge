@@ -13,7 +13,7 @@
     <span class="mark"></span>
     <div>
       <h1>Texture Forge</h1>
-      <p>Flat livery textures — local FLUX by default, cloud engines opt-in</p>
+      <p>Flat livery textures, concept packs and template paints — local FLUX, nothing leaves the machine</p>
     </div>
   </div>
   <div class="engine">
@@ -56,10 +56,6 @@
       <input id="cWordmark" type="file" accept=".png,.svg,.webp">
       <p class="tip">Lettering is never generated — diffusion melts it. Drop the real logo here and it ships in the pack untouched.</p>
 
-      <h2>Engine</h2>
-      <div id="cProviders" class="presets"></div>
-      <p class="tip" id="cProvNote"></p>
-
       <label class="chk" style="margin-top:10px"><input id="cRender" type="checkbox" checked> Studio render of the car</label>
       <label class="row"><span>Seed</span><input id="cSeed" type="number" placeholder="random"></label>
 
@@ -85,8 +81,7 @@
 
       <h2>Base</h2>
       <div class="modes" id="pBaseMode">
-        <button data-m="gpt" class="on">GPT Image 2</button>
-        <button data-m="kontext">Kontext</button>
+        <button data-m="kontext" class="on">Kontext</button>
         <button data-m="texture">Texture</button>
         <button data-m="color">Colour</button>
       </div>
@@ -94,17 +89,7 @@
         <input id="pBrief" type="text" placeholder="Day of the Dead, inspired by Operation Motorsport" autocomplete="off">
         <label class="row" style="margin-top:8px"><span>Colours</span><input id="pPalette" type="text" placeholder="black with orange, magenta, violet"></label>
       </div>
-      <div id="pGptBox">
-        <label class="row"><span>Size</span>
-          <select id="pGptSize">
-            <option value="1024x1024">1024 — ~$0.20</option>
-            <option value="1536x1536">1536 — ~$0.45</option>
-            <option value="2048x2048">2048 — ~$0.80</option>
-          </select></label>
-        <label class="chk"><input id="pUseRender" type="checkbox" checked> Copy the concept pack's render onto the sheet</label>
-        <p class="tip">Cloud, paid, sends the sheet and the render to OpenAI. This is the route that puts the skull on the door: with the render as reference it reproduces the design panel by panel. Without a pack it designs from the brief alone.</p>
-      </div>
-      <div id="pKontextBox" class="hidden">
+      <div id="pKontextBox">
         <label class="row"><span>Guidance</span><input id="pGuidance" type="range" min="1.5" max="4" step="0.1" value="2.5"></label>
         <p class="tip" id="pKontextNote">Local and free, but honest warning: Kontext fills each panel with pattern and does not understand the car. Expect texture, not a design.</p>
       </div>
@@ -199,22 +184,11 @@
       <h2 class="presetOnly">Extra detail <span class="opt">optional</span></h2>
       <input id="extra" type="text" class="presetOnly" placeholder="e.g. embers drifting upward">
 
-      <h2>Engine</h2>
-      <div id="providers" class="presets"></div>
-      <p class="tip" id="provNote"></p>
-
       <h2>Output</h2>
       <label class="row"><span>Render size</span>
         <select id="genSize"></select>
       </label>
-      <label class="row cloudOnly hidden"><span>Quality</span>
-        <select id="quality">
-          <option value="high">high — best, ~$0.21</option>
-          <option value="medium">medium — ~$0.05</option>
-          <option value="low">low — draft, ~$0.01</option>
-        </select>
-      </label>
-      <label class="row localOnly"><span>Steps</span><input id="steps" type="number" value="20" min="8" max="50"></label>
+      <label class="row"><span>Steps</span><input id="steps" type="number" value="20" min="8" max="50"></label>
       <label class="row"><span>Seed</span><input id="seed" type="number" placeholder="random"></label>
 
       <h2>Finishing</h2>
@@ -282,14 +256,7 @@
     <aside class="panel">
       <h2>First-run setup</h2>
       <p class="tip">Texture Forge drives ComfyUI. This checks everything is in place
-        and fetches the model for you — no terminal, no Hugging Face account.</p>
-      <h2 style="margin-top:20px">OpenAI API key <span class="opt">optional</span></h2>
-      <input id="oaiKey" type="password" placeholder="sk-..." autocomplete="off">
-      <p class="tip">Only needed for the GPT Image 2 engine. A <b>ChatGPT subscription does
-        not include API access</b> — this key comes from platform.openai.com and is billed
-        separately. Stored locally in <code>config.json</code>, which is gitignored.</p>
-      <button id="btnKey" class="ghost" style="width:100%;margin-top:8px">Save &amp; test key</button>
-
+        and fetches the model for you — no terminal, no Hugging Face account, no API keys.</p>
       <button id="btnRecheck" class="ghost" style="width:100%;margin-top:12px">Re-check</button>
       <button id="btnInstall" class="primary big">Download model</button>
       <p class="tip" id="setupNote"></p>

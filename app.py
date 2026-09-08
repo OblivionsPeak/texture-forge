@@ -55,25 +55,7 @@ def list_providers():
         "providers": [{"id": k, "name": v["name"], "cloud": v["cloud"],
                        "hint": v["hint"], "sizes": v["sizes"]}
                       for k, v in providers.PROVIDERS.items()],
-        "openai_key_set": bool(providers.api_key("openai_api_key")),
     })
-
-
-@app.route("/api/providers/key", methods=["POST"])
-def set_key():
-    body = request.get_json(force=True) or {}
-    key, err = providers.clean_key(body.get("openai_api_key"))
-    if err:
-        return jsonify({"ok": False, "message": err}), 400
-    cfg = providers.load_config()
-    cfg["openai_api_key"] = key
-    providers.save_config(cfg)
-    ok, msg = providers.test_openai()
-    if not ok:
-        # Do not leave a key on disk that we just proved does not work.
-        cfg.pop("openai_api_key", None)
-        providers.save_config(cfg)
-    return jsonify({"ok": ok, "message": msg})
 
 
 @app.route("/api/setup")
@@ -135,8 +117,7 @@ def _finish_decal(img, stem, provider):
     """Decals keep their alpha and their aspect - no tiling, no square crop."""
     removed = 0.0
     if img.mode != "RGBA" or img.getchannel("A").getextrema()[0] == 255:
-        # No alpha came back (local FLUX, or a cloud image with an opaque
-        # background), so knock the flat background out ourselves.
+        # FLUX returns no alpha, so knock the flat background out ourselves.
         img, removed = post.cutout(img)
     img = post.trim_to_subject(img)
     name = f"{stem}.png"
@@ -179,13 +160,10 @@ def generate():
     h = int(body.get("height", 1024))
     if kind == "artwork":
         w, h = prompts.ARTWORK_SHAPES.get(body.get("shape", "square"), (1024, 1024))
-        if provider != "local":
-            w, h = {"wide": (1536, 1024), "tall": (1024, 1536)}.get(body.get("shape"), (1024, 1024))
     try:
         src = providers.generate(provider, prompt=pos, negative=neg, width=w, height=h,
                                  seed=seed, steps=int(body.get("steps", 20)),
                                  guidance=float(body.get("guidance", 3.5)),
-                                 quality=body.get("quality", "high"),
                                  transparent=(kind == "decal"))
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
@@ -298,7 +276,7 @@ def concept_job(job_id):
 
 @app.route("/api/concept/palette", methods=["POST"])
 def concept_palette():
-    """Palette from any render you already have, such as one ChatGPT made."""
+    """Palette from any render you already have."""
     f = request.files.get("image")
     if not f:
         return jsonify({"ok": False, "error": "no image"}), 400
@@ -353,8 +331,6 @@ def packs_list():
 @app.route("/api/paint/start", methods=["POST"])
 def paint_start():
     body = request.get_json(force=True) or {}
-    if body.get("base") == "gpt" and not providers.api_key("openai_api_key"):
-        return jsonify({"ok": False, "error": "No OpenAI key set. Add one in the Setup tab."}), 409
     if body.get("base") == "kontext":
         if not comfy.kontext_ready():
             return jsonify({"ok": False, "error": "The Kontext model is not installed yet."}), 409

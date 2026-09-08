@@ -3,10 +3,8 @@
 Flat livery textures from local FLUX, plus the silhouette layers diffusion does
 badly. Browser UI on `http://localhost:4796`.
 
-**Local FLUX is the default**: free, offline, no keys, nothing leaves the
-machine. A cloud engine can be selected instead — see [Engines](#engines) — and
-that does send your prompt to a third party and cost money per image, so it is
-opt-in and labelled everywhere it appears.
+**Everything runs locally**: free, offline, no keys, nothing leaves the
+machine. There is one engine, FLUX through ComfyUI, on purpose.
 
 **Windows:** double-click **`Start Texture Forge.bat`**.
 **macOS / Linux:** run `./start-texture-forge.sh`.
@@ -150,7 +148,7 @@ distance, with a measured value range.
 
 ## Concept packs
 
-The **Concept** tab is the "ask ChatGPT for a mock-up" workflow, run locally.
+The **Concept** tab is the "ask a chatbot for a mock-up" workflow, run locally.
 One brief — *Day of the Dead, inspired by Operation Motorsport* — produces:
 
 1. a **side-profile studio render** of the car wearing the concept, for pitching;
@@ -164,9 +162,8 @@ lines to rewrite. The list is editable before anything is generated.
 
 Two things are deliberate. **Lettering is never generated**: diffusion melts it,
 so the local render reserves a blank white door panel and the real wordmark is
-dropped in as a file and shipped through the pack untouched. With the GPT
-Image 2 engine the team name is asked for outright, since that model writes
-text legibly. And **the render is a pitch image, not a paint file**: it shows one
+dropped in as a file and shipped through the pack untouched. And **the render
+is a pitch image, not a paint file**: it shows one
 side of a 3D car, the template is a flattened UV sheet, and there is no honest
 projection between them without the car's mesh. Placement stays in Clearcoat.
 
@@ -185,7 +182,7 @@ white halo. A marigold's orange edge fails the paleness test and is left alone.
 
 ## Painting the real template
 
-The **Paint** tab is the step ChatGPT cannot do: a finished paint sheet for a
+The **Paint** tab produces a finished paint sheet for a
 specific iRacing car, exported as TGA. Nothing is traced by hand.
 
 **Drop in the car's paint-kit PSD.** Four hidden layers inside every kit carry
@@ -202,16 +199,14 @@ Checked on four kits (992 GT3 R, M4 GT4, AMG GT3 2020, Dallara P217): all four
 yielded 8–11 sponsor zones and 3–6 number zones. A kit with no block layers
 falls back to flat areas found from the curvature map.
 
-**Pick a base.** *GPT Image 2* is the one that works: the clean sheet goes to
-the cloud edit model as image one and the concept pack's render as image two,
-with the instruction to reproduce that design on the sheet. It put the skull on
-the door, the marigold on the fender and the papel picado along the wing, with
-0.6% of painted pixels outside the mask and 84% of the mask boundary landing
-on an edge in the output. Cloud, paid (about $0.20 at 1024). *Kontext* is the
-local equivalent and, measured honestly, does not understand the car: it fills
-each panel with pattern centred on that panel, and given the render as a second
-reference it draws the flowers and throws the sheet layout away. Kept, labelled.
-*Texture* stretches or tiles anything from the Textures tab. *Colour* is a flat
+**Pick a base.** *Kontext* sends the clean shaded sheet to FLUX Kontext dev with
+the brief and it paints straight onto the sheet, keeping every part where the
+template put it — about 75 s on the 5070. Measured honestly, it does not
+understand the car: it fills each panel with pattern centred on that panel,
+and given a concept render as a second reference it draws the motifs and
+throws the sheet layout away. It is a base, not a design. Motifs, wordmark and
+numbers are placed on top by the zone logic below, which is where the design
+comes from. *Texture* stretches or tiles anything from the Textures tab. *Colour* is a flat
 fill.
 
 **Add a concept pack and a number.** The wordmark lands on the two flattest wide
@@ -226,9 +221,11 @@ Feeding an edit model the composite (with the faint mesh and the kit's decals)
 made it paint the mesh lines and the Porsche crest into the livery. The clean
 sheet — body layer only, dead space dark — fixed that in one run.
 
-That is also the answer to how the commercial "paint your real template" tools
-most plausibly work: a hosted edit model with the flattened sheet as input,
-priced per render into credits. Nothing about it needs a custom model. Kontext ships as a split
+The commercial "paint your real template" tools most plausibly run a hosted
+image-edit model with the flattened sheet as input, priced per render into
+credits. That route was tried here and it does reproduce a concept render onto
+the sheet panel by panel; it was removed again because it needs an API key
+and sends the template off the machine, which this tool does not do. Kontext ships as a split
 UNet (`flux1-dev-kontext_fp8_scaled.safetensors`, 11.9 GB) and shares the FLUX
 dev text encoders and VAE.
 
@@ -272,25 +269,11 @@ paths, with `COMFYUI_DIR` as an override.
 **Stop the engine before racing.** ComfyUI holds ~8 GB of VRAM that iRacing
 wants. The Stop button frees it; restarting takes about 40 seconds.
 
-## Engines
+## Engine
 
-| Engine | Cost | Notes |
-|---|---|---|
-| **FLUX (local)** | free | Default. Offline, ~40 s, needs a 12 GB GPU and the engine running. |
-| **GPT Image 2** | ~$0.01 low / $0.05 medium / $0.21 high per image | Cloud. Sends the prompt to OpenAI. Generates up to 2048² directly. |
-
-The key goes in the **Setup** tab and is stored in `config.json`, which is
-gitignored and never committed. `OPENAI_API_KEY` in the environment also works.
-
-**A ChatGPT subscription does not include API access.** They are separate
-products with separate billing. The key comes from `platform.openai.com` and
-needs its own pay-as-you-go credit.
-
-Two behavioural differences worth knowing. Cloud image APIs have **no negative
-prompt field**, so the exclusions that keep vignettes and watermarks out are
-folded into the prompt as explicit instructions instead. And the motif compiler
-matters less on a cloud model — it exists because FLUX paints the noun rather
-than its texture, and stronger instruction-following needs less hand-holding.
+One engine: FLUX.1-dev through a local ComfyUI, plus FLUX Kontext dev for the
+Paint tab's template base. Both are free, offline and hold VRAM only while the
+engine is running — press **Stop** before racing. No API keys anywhere.
 
 ## Where this sits
 

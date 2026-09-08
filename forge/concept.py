@@ -1,6 +1,6 @@
 """Concept packs: one brief in, a studio render + cut-out motifs + palette out.
 
-This is the "ChatGPT mock-up" workflow, done locally. A brief like "Day of the
+This is the "ask a chatbot for a mock-up" workflow, done locally. A brief like "Day of the
 Dead, inspired by Operation Motorsport" becomes:
 
   1. a side-profile studio render of the car wearing the concept, for pitching;
@@ -194,8 +194,8 @@ def render_prompt(brief, car="prototype", team=None, palette=None, motifs=None,
 
     text_capable is the fork that matters. FLUX will try to write the team name
     and produce alphabet soup, so the local prompt asks for a BLANK panel where
-    the wordmark goes and says "no text" as hard as it can. GPT Image renders
-    text well, so that route asks for the name outright.
+    the wordmark goes and says "no text" as hard as it can. text_capable is
+    left in for any future engine that can actually write.
     """
     car_desc = CARS.get(car, CARS["prototype"])
     motif_txt = ""
@@ -334,7 +334,6 @@ def _build(job, body):
     style = body.get("style", "vinyl")
     palette_hint = (body.get("palette_hint") or "").strip() or None
     want_render = bool(body.get("render", True))
-    quality = body.get("quality", "high")
     steps = int(body.get("steps", 20))
     seed0 = int(body.get("seed") or random.randint(1, 2**31 - 1))
 
@@ -349,10 +348,10 @@ def _build(job, body):
         pos, neg = render_prompt(brief, car, team, palette_hint, motifs,
                                  text_capable=prov["cloud"])
         # Landscape, because a side profile is wide. 1408x1024 is the largest
-        # FLUX frame that fits the 12GB card; gpt-image-2 takes any /16 size.
-        w, h = (1408, 1024) if provider == "local" else (1536, 1024)
+        # FLUX frame that fits the 12GB card.
+        w, h = 1408, 1024
         src = providers.generate(provider, prompt=pos, negative=neg, width=w, height=h,
-                                 seed=seed0, steps=steps, guidance=3.5, quality=quality)
+                                 seed=seed0, steps=steps, guidance=3.5)
         img = Image.open(src).convert("RGB")
         img.save(folder / "render.png")
         pal = extract_palette(img)
@@ -371,8 +370,7 @@ def _build(job, body):
         pos, neg = prompts.compile_single(m, st, palette_hint)
         seed = seed0 + i + 1
         src = providers.generate(provider, prompt=pos, negative=neg, width=1024, height=1024,
-                                 seed=seed, steps=steps, guidance=3.5, quality=quality,
-                                 transparent=True)
+                                 seed=seed, steps=steps, guidance=3.5)
         img = Image.open(src)
         removed = 0.0
         if img.mode != "RGBA" or img.getchannel("A").getextrema()[0] == 255:
