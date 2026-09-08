@@ -1,7 +1,8 @@
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
 
-let STATE = { presets: [], shapes: [], treatments: [], styles: [], providers: [], provider: 'local', style: 'woodblock',
+let STATE = { presets: [], shapes: [], treatments: [], styles: [], mediums: [], medium: 'photo',
+              providers: [], provider: 'local', style: 'woodblock',
               preset: 'storm', shape: 'mountains', treatment: 'surface',
               texMode: 'describe', busy: false };
 
@@ -47,6 +48,7 @@ async function refreshStatus() {
     STATE.shapes = s.shapes;
     STATE.treatments = s.treatments || [];
     STATE.styles = s.styles || [];
+    STATE.mediums = s.mediums || [];
     const dot = $('#engineDot');
     dot.className = 'dot ' + (s.comfy_up ? 'up' : 'down');
     $('#engineText').textContent = s.comfy_up
@@ -54,7 +56,7 @@ async function refreshStatus() {
       : 'engine stopped';
     $('#btnStart').disabled = s.comfy_up;
     $('#btnStop').disabled = !s.comfy_up;
-    if (!$('#presets').children.length) { renderPresets(); renderShapes(); renderTreatments(); renderStyles(); }
+    if (!$('#presets').children.length) { renderPresets(); renderShapes(); renderTreatments(); renderStyles(); renderMediums(); }
   } catch (e) {
     $('#engineText').textContent = 'server unreachable';
   }
@@ -152,15 +154,21 @@ $('#btnGen').onclick = async () => {
   if (single && !$('#subjectSingle').value.trim()) {
     toast('Say what the image should be first.', true); return;
   }
+  const artwork = STATE.texMode === 'artwork';
+  if (artwork && !$('#subjectArt').value.trim()) {
+    toast('Describe the scene first.', true); return;
+  }
   const el = $('#texResult');
   el.classList.remove('empty');
   busy(true, el, prov && prov.cloud ? 'Forging via GPT Image 2…' : 'Forging… first run also loads the model, so allow a minute.');
   try {
     const describing = STATE.texMode === 'describe';
     const r = await api('/api/generate', {
-      kind: single ? 'decal' : 'texture',
-      subject: single ? $('#subjectSingle').value : (describing ? $('#subject').value : null),
+      kind: single ? 'decal' : (artwork ? 'artwork' : 'texture'),
+      subject: single ? $('#subjectSingle').value
+             : (artwork ? $('#subjectArt').value : (describing ? $('#subject').value : null)),
       style: STATE.style,
+      medium: STATE.medium, shape: $('#artShape').value,
       provider: STATE.provider,
       quality: $('#quality') ? $('#quality').value : 'high',
       freeform: describing,
@@ -176,7 +184,7 @@ $('#btnGen').onclick = async () => {
       contrast: +$('#contrast').value,
       saturation: +$('#sat').value,
     });
-    el.innerHTML = (single ? decalBlock(r) : resultBlock(r, 'Texture'))
+    el.innerHTML = (single ? decalBlock(r) : resultBlock(r, artwork ? 'Artwork' : 'Texture'))
       + (r.prompt ? `<div class="prompt-peek"><b>Prompt sent:</b> ${esc(r.prompt)}</div>` : '');
     // A decal has no value range: the metric predicts how a SURFACE reads at
     // distance, which says nothing useful about a cut-out badge. Reading it
@@ -436,6 +444,20 @@ $('#btnInstall').onclick = async () => {
   refreshSetup(false);
 };
 
+function renderMediums() {
+  const box = $('#mediums');
+  if (!box || !STATE.mediums) return;
+  box.innerHTML = STATE.mediums.map((t) =>
+    `<button data-id="${t.id}" title="${esc(t.hint)}" class="${t.id === STATE.medium ? 'on' : ''}">
+       <b>${esc(t.name)}</b><i>${esc(t.hint.split('.')[0])}</i></button>`).join('');
+  $$('#mediums button').forEach((b) => {
+    b.onclick = () => {
+      STATE.medium = b.dataset.id;
+      $$('#mediums button').forEach((x) => x.classList.toggle('on', x === b));
+    };
+  });
+}
+
 function renderStyles() {
   const box = $('#styles');
   if (!box) return;
@@ -456,9 +478,13 @@ function applyTexMode() {
   $('#describeBox').classList.toggle('hidden', m !== 'describe');
   $('#presetBox').classList.toggle('hidden', m !== 'preset');
   $('#singleBox').classList.toggle('hidden', m !== 'single');
+  $('#artworkBox').classList.toggle('hidden', m !== 'artwork');
   $$('.presetOnly').forEach((e) => e.classList.toggle('hidden', m !== 'preset'));
-  // Tiling and vignette controls make no sense for a cut-out decal.
-  $$('.textureOnly').forEach((e) => e.classList.toggle('hidden', m === 'single'));
+  // Tiling and vignette controls make no sense for a cut-out decal, and
+  // artwork keeps its own shape rather than a square render size.
+  $$('.textureOnly').forEach((e) => e.classList.toggle('hidden', m === 'single' || m === 'artwork'));
+  $('#genSize').parentElement.classList.toggle('hidden', m === 'artwork');
+  $('#btnGen').textContent = m === 'artwork' ? 'Forge artwork' : (m === 'single' ? 'Forge image' : 'Forge texture');
 }
 
 /* -------------------------------------------------------------- concept */

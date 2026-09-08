@@ -122,6 +122,13 @@ engine becomes machined plating. Unmatched subjects get a generic surface
 treatment rather than an error, and the compiled prompt is shown under every
 result so the translation is visible rather than magic.
 
+*Artwork* is the opposite of the other two: a whole scene or illustration
+with a subject — a sunset over mesas, a lone rider — at door, hood or wing
+end-plate proportions, in photo, painted, vector or vintage-poster medium. It
+does not tile and is not meant to; it is the one mode that gives you a
+*picture*, for placing on a single panel in Clearcoat. Typing a landscape into
+*Describe it* gives you the landscape's rock texture instead, by design.
+
 *Presets* gives 12 ready-made looks (storm lightning, nebula swirl, fractured
 glass, cracked lava, liquid metal, ink in water, circuit grid, high-contrast
 camo, marble, aurora, carbon weave, topographic).

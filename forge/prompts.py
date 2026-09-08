@@ -393,3 +393,67 @@ def compile_single(subject, style="woodblock", color=None):
     if color and color.strip():
         body += f", {color.strip()} colour scheme"
     return f"{body}, {ISOLATED}", DECAL_NEGATIVE
+
+
+# ------------------------------------------------------------------ artwork
+
+# The opposite of everything above. A texture is a surface with no subject;
+# artwork is a picture WITH one - a landscape, a scene, a character - meant
+# to sit on a door or a hood as a single panel, not to tile. What survives
+# from the texture rules is only what still ruins a car panel: vignettes,
+# text, borders, and the photographic depth of field that turns to mush at
+# distance.
+ARTWORK_MEDIUMS = {
+    "photo": {
+        "name": "Photo",
+        "hint": "Photorealistic scene. Deep focus, no blur.",
+        "wrap": "photorealistic wide shot of {subject}, everything in sharp focus front to back, "
+                "vivid natural colour, dramatic light, cinematic composition",
+    },
+    "painted": {
+        "name": "Painted",
+        "hint": "Rich illustrated scene, brushwork and depth.",
+        "wrap": "richly painted illustration of {subject}, confident brushwork, deep saturated "
+                "colour, strong light and shadow, epic composition",
+    },
+    "vector": {
+        "name": "Vector",
+        "hint": "Flat graphic scene. Hardest edges, reads at distance.",
+        "wrap": "bold flat vector illustration of {subject}, clean shapes, limited palette, "
+                "no gradients, poster graphic, high contrast",
+    },
+    "vintage": {
+        "name": "Vintage poster",
+        "hint": "Mid-century travel-poster look. Grain and warm palette.",
+        "wrap": "vintage mid-century travel poster illustration of {subject}, screen-print "
+                "texture, warm limited palette, stylised shapes, bold silhouettes",
+    },
+}
+
+ARTWORK_TAIL = (
+    "full-bleed composition filling the entire frame edge to edge, evenly exposed, "
+    "no vignette, no dark corners, no frame, no border, no text, no letters, no watermark"
+)
+
+ARTWORK_NEGATIVE = (
+    "text, letters, words, watermark, signature, logo, frame, border, vignette, "
+    "dark corners, blurry, out of focus, depth of field, bokeh, low contrast, "
+    "car, vehicle, mockup, product shot"
+)
+
+ARTWORK_SHAPES = {
+    "square": (1024, 1024),
+    "wide": (1408, 768),       # a door or a sill
+    "tall": (768, 1408),       # a rear wing end plate or a bonnet strip
+}
+
+
+def compile_artwork(subject, medium="photo", color=None):
+    subject = (subject or "").strip()
+    if not subject:
+        raise ValueError("describe the scene first")
+    m = ARTWORK_MEDIUMS.get(medium) or ARTWORK_MEDIUMS["photo"]
+    body = m["wrap"].format(subject=subject)
+    if color and color.strip():
+        body += f", {color.strip()} colour palette"
+    return f"{body}, {ARTWORK_TAIL}", ARTWORK_NEGATIVE

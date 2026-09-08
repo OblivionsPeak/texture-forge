@@ -147,6 +147,24 @@
         <button data-m="describe" class="on">Describe it</button>
         <button data-m="preset">Presets</button>
         <button data-m="single">Single image</button>
+        <button data-m="artwork">Artwork</button>
+      </div>
+
+      <div id="artworkBox" class="hidden">
+        <h2>What's the picture?</h2>
+        <input id="subjectArt" type="text" placeholder="a wild western landscape at sunset, mesas and cacti" autocomplete="off">
+        <p class="tip">A whole scene or illustration, not a surface. This is the one mode that gives you a
+          <i>picture</i> — for a door, a hood or a wing end plate in Clearcoat. Does not tile.</p>
+
+        <h2>Medium</h2>
+        <div id="mediums" class="presets"></div>
+
+        <h2>Shape</h2>
+        <select id="artShape">
+          <option value="wide">wide — door / sill (1408×768)</option>
+          <option value="square">square (1024×1024)</option>
+          <option value="tall">tall — wing end plate (768×1408)</option>
+        </select>
       </div>
 
       <div id="describeBox">

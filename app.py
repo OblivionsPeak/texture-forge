@@ -42,6 +42,8 @@ def status():
                        for k, v in prompts.TREATMENTS.items()],
         "styles": [{"id": k, "name": v["name"], "hint": v["hint"]}
                    for k, v in prompts.SUBJECT_STYLES.items()],
+        "mediums": [{"id": k, "name": v["name"], "hint": v["hint"]}
+                    for k, v in prompts.ARTWORK_MEDIUMS.items()],
         "shapes": [{"id": k, "name": v["name"], "hint": v["hint"], "seamless": v["seamless"]}
                    for k, v in silhouette.SHAPES.items()],
     })
@@ -97,16 +99,25 @@ def comfy_control(action):
     return jsonify({"ok": ok, "message": msg, "vram": comfy.vram() if comfy.is_up() else None})
 
 
-def _finish(img, body, stem):
+def _finish(img, body, stem, keep_aspect=False):
     """Post-process, save, measure, and return the payload the UI needs."""
-    tex = post.to_texture(
-        img,
-        size=int(body.get("size", 2048)),
-        do_devignette=bool(body.get("devignette", True)),
-        tile=bool(body.get("tile", False)),
-        contrast=float(body.get("contrast", 1.0)),
-        saturation=float(body.get("saturation", 1.0)),
-    )
+    if keep_aspect:
+        # Artwork keeps its panel shape: long side to 2048, no tiling.
+        tex = post.punch(post.devignette(img.convert("RGB")) if body.get("devignette", True)
+                         else img.convert("RGB"),
+                         float(body.get("contrast", 1.0)), float(body.get("saturation", 1.0)))
+        w, h = tex.size
+        s = 2048 / max(w, h)
+        tex = tex.resize((max(1, int(w * s)), max(1, int(h * s))), Image.LANCZOS)
+    else:
+        tex = post.to_texture(
+            img,
+            size=int(body.get("size", 2048)),
+            do_devignette=bool(body.get("devignette", True)),
+            tile=bool(body.get("tile", False)),
+            contrast=float(body.get("contrast", 1.0)),
+            saturation=float(body.get("saturation", 1.0)),
+        )
     name = f"{stem}.png"
     tex.save(OUT / name)
     sq = post.squint(tex)
@@ -150,6 +161,10 @@ def generate():
             pos, neg = prompts.compile_single(
                 body.get("subject"), body.get("style", "woodblock"), body.get("color"))
             preset = "decal"
+        elif kind == "artwork":
+            pos, neg = prompts.compile_artwork(
+                body.get("subject"), body.get("medium", "photo"), body.get("color"))
+            preset = "artwork"
         elif body.get("freeform"):
             pos, neg = prompts.compile_freeform(
                 body.get("subject"), body.get("treatment", "surface"), body.get("color"))
@@ -162,6 +177,10 @@ def generate():
     seed = int(body.get("seed") or random.randint(1, 2**31 - 1))
     w = int(body.get("width", 1024))
     h = int(body.get("height", 1024))
+    if kind == "artwork":
+        w, h = prompts.ARTWORK_SHAPES.get(body.get("shape", "square"), (1024, 1024))
+        if provider != "local":
+            w, h = {"wide": (1536, 1024), "tall": (1024, 1536)}.get(body.get("shape"), (1024, 1024))
     try:
         src = providers.generate(provider, prompt=pos, negative=neg, width=w, height=h,
                                  seed=seed, steps=int(body.get("steps", 20)),
@@ -173,7 +192,10 @@ def generate():
 
     img = Image.open(src)
     stem = f"{preset}_{seed}_{int(time.time())}"
-    payload = _finish_decal(img, stem, provider) if kind == "decal" else _finish(img, body, stem)
+    if kind == "decal":
+        payload = _finish_decal(img, stem, provider)
+    else:
+        payload = _finish(img, body, stem, keep_aspect=(kind == "artwork"))
     payload.update({"ok": True, "seed": seed, "prompt": pos, "provider": provider})
     return jsonify(payload)
 
