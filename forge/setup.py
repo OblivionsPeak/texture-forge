@@ -46,6 +46,18 @@ SPLIT = [
      "sha256": "afc8e28272cd15db3919bacdb6918ce9c1ed22e96cb12c4d5ed0fba823529e38"},
 ]
 
+# FLUX Kontext dev, for the Tweak button. Comfy-Org's fp8 repack, not gated.
+# It is a UNet only; text encoders and VAE come from the FLUX dev install.
+KONTEXT = {
+    "name": comfy.KONTEXT,
+    "url": "https://huggingface.co/Comfy-Org/flux1-kontext-dev_ComfyUI/resolve/main/"
+           "split_files/diffusion_models/flux1-dev-kontext_fp8_scaled.safetensors",
+    "folder": "diffusion_models",
+    "approx_gb": 11.9,
+    "sha256": None,
+    "expect_tensors": None,
+}
+
 PROGRESS = {"active": False, "file": None, "done": 0, "total": 0,
             "percent": 0, "speed": 0, "message": "", "error": None, "finished": False}
 _lock = threading.Lock()
@@ -78,6 +90,8 @@ def status():
         "comfy_venv": venv,
         "layout": lay,
         "model_ready": lay is not None,
+        "kontext_ready": found and comfy.kontext_ready(),
+        "kontext_gb": KONTEXT["approx_gb"],
         "missing": missing,
         "free_disk_gb": round(free_disk_gb(d.anchor or d) or 0, 1),
         "running": comfy.is_up(),
@@ -158,7 +172,9 @@ def install_model(kind="checkpoint"):
     if not (comfy.COMFY_DIR / "main.py").exists():
         return False, f"ComfyUI not found. Install it, or set COMFYUI_DIR."
 
-    specs = [CHECKPOINT] if kind == "checkpoint" else SPLIT
+    specs = {"checkpoint": [CHECKPOINT], "split": SPLIT, "kontext": [KONTEXT]}.get(kind)
+    if not specs:
+        return False, f"unknown download kind {kind}"
     need = sum(s["approx_gb"] for s in specs)
     free = free_disk_gb(comfy.COMFY_DIR.anchor or comfy.COMFY_DIR)
     if free is not None and free < need + 2:

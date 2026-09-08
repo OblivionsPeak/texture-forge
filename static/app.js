@@ -111,6 +111,45 @@ function renderPresets() {
   if (p) { $('#color').placeholder = p.color; $('#genNote').textContent = p.hint; }
 }
 
+/* ------------------------------------------------------------------ tweak */
+
+// One box under every result: an instruction in, the edited image out, with
+// everything not mentioned kept. Kontext is an editor, not a painter, and
+// this is the job it is actually good at.
+function tweakBox(file) {
+  const id = 'tw' + Math.random().toString(36).slice(2, 8);
+  return `<div class="tweak" data-file="${esc(file)}">
+    <input type="text" id="${id}" placeholder="Tweak it: make it more purple, remove the shadow, add embers…" autocomplete="off">
+    <button class="primary" onclick="tweakResult(this)">Tweak</button></div>
+    <p class="tweak-note">Edits this result with Kontext and keeps everything you don't mention. About a minute.</p>`;
+}
+
+async function tweakResult(btn) {
+  if (STATE.busy) return;
+  const box = btn.parentElement;
+  const file = box.dataset.file;
+  const instruction = box.querySelector('input').value.trim();
+  if (!instruction) { toast('Say what to change first.', true); return; }
+  const stage = box.closest('.result') || box.closest('.stage');
+  btn.disabled = true; btn.textContent = 'Tweaking…';
+  STATE.busy = true;
+  try {
+    const r = await api('/api/tweak', { file, instruction });
+    STATE.busy = false;
+    if (r.kind === 'decal') {
+      stage.innerHTML = decalBlock(r) + `<div class="prompt-peek"><b>Tweak:</b> ${esc(instruction)}</div>`;
+      toast('Tweaked.');
+    } else {
+      stage.innerHTML = resultBlock(r, 'Tweaked') + `<div class="prompt-peek"><b>Tweak:</b> ${esc(instruction)}</div>`;
+      toast('Tweaked. Tweak again to keep going.');
+    }
+  } catch (e) {
+    STATE.busy = false;
+    btn.disabled = false; btn.textContent = 'Tweak';
+    toast(e.message, true);
+  }
+}
+
 function decalBlock(r) {
   const cut = r.cutout > 0
     ? `background removed (${r.cutout}% of frame)`
@@ -122,7 +161,8 @@ function decalBlock(r) {
       <figcaption style="font-size:11px;color:var(--mute);margin-top:6px">
         ${r.size[0]}×${r.size[1]} · ${esc(cut)}</figcaption>
     </figure>
-    <div class="acts"><a href="${r.url}" download><button>Download PNG</button></a></div>`;
+    <div class="acts"><a href="${r.url}" download><button>Download PNG</button></a></div>
+    ${tweakBox(r.file)}`;
 }
 
 function resultBlock(r, title) {
@@ -141,6 +181,7 @@ function resultBlock(r, title) {
       <a href="${r.url}" download><button>Download PNG</button></a>
       <button onclick="navigator.clipboard.writeText('${r.file}');">Copy filename</button>
     </div>
+    ${tweakBox(r.file)}
     <p class="meta">Saved to <code>out/${r.file}</code>${r.seed ? ` · seed ${r.seed}` : ''}${r.provider ? ` · ${esc(r.provider)}` : ''}</p>`;
 }
 
@@ -373,6 +414,11 @@ async function refreshSetup(showSpinner) {
     rows.push(row(s.free_disk_gb > 20 ? 'ok' : 'warn', `${s.free_disk_gb} GB free on that drive`,
       s.free_disk_gb > 20 ? 'Enough room for the model.' : 'The model needs roughly 16 GB plus headroom.'));
 
+    rows.push(s.kontext_ready
+      ? row('ok', 'Kontext ready', 'The Tweak box under every result is live.')
+      : row('warn', 'Kontext not installed',
+          `Optional. Powers the <b>Tweak</b> box. About ${s.kontext_gb} GB — press <b>Download Kontext</b>.`));
+
     rows.push(s.running
       ? row('ok', 'Engine running', 'Ready to forge. Stop it before racing to free VRAM.')
       : row('warn', 'Engine stopped', 'Press <b>Start engine</b> in the header when you want to generate.'));
@@ -391,6 +437,7 @@ async function refreshSetup(showSpinner) {
   el.classList.remove('empty');
   el.innerHTML = `<div class="checks">${rows.join('')}</div>${prog}`;
   $('#btnInstall').disabled = !s.comfy_found || s.model_ready || p.active;
+  $('#btnInstallKontext').disabled = !s.comfy_found || s.kontext_ready || p.active;
   $('#setupNote').textContent = s.model_ready
     ? 'Everything is in place.'
     : (p.active ? 'Downloading — you can leave this tab open.' : '');
@@ -400,6 +447,14 @@ async function refreshSetup(showSpinner) {
 }
 
 $('#btnRecheck').onclick = () => refreshSetup(true);
+$('#btnInstallKontext').onclick = async () => {
+  $('#btnInstallKontext').disabled = true;
+  try {
+    const r = await api('/api/setup/install', { kind: 'kontext' });
+    toast(r.message);
+  } catch (e) { toast(e.message, true); }
+  refreshSetup(false);
+};
 $('#btnInstall').onclick = async () => {
   $('#btnInstall').disabled = true;
   try {
@@ -528,7 +583,8 @@ function packBlock(j, motifs) {
 
   const hero = j.render
     ? `<div class="hero"><img src="${j.render.url}?t=${j.render.seed}" alt="concept render">
-         <p class="meta" style="margin-top:6px">Studio render · ${j.render.size[0]}×${j.render.size[1]} · seed ${j.render.seed} · a pitch image, not a paint file</p></div>`
+         <p class="meta" style="margin-top:6px">Studio render · ${j.render.size[0]}×${j.render.size[1]} · seed ${j.render.seed} · a pitch image, not a paint file</p>
+         ${j.done ? tweakBox(j.render.url.replace(/^\/out\//, '')) : ''}</div>`
     : (j.step.startsWith('rendering') ? `<div class="hero"><div class="spin"></div><p class="meta">Rendering the car…</p></div>` : '');
 
   const pal = j.palette && j.palette.length

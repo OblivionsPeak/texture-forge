@@ -121,6 +121,12 @@ input[type=range]::-webkit-slider-thumb{
 .toast.show{opacity:1; transform:translate(-50%,0)}
 .toast.err{border-left-color:var(--bad)}
 
+/* tweak box */
+.tweak{display:flex; gap:8px; width:100%; max-width:640px; margin-top:4px}
+.tweak input{flex:1}
+.tweak button{flex:0 0 auto}
+.tweak-note{font-size:11px; color:var(--mute); max-width:640px; text-align:center}
+
 /* concept pack */
 textarea{
   width:100%; background:var(--panel2); color:var(--ink); border:1px solid var(--line);

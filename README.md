@@ -180,6 +180,20 @@ samples the rim colour where the subject meets the background and peels
 inward while pixels stay pale, so the decal lands on a dark panel without a
 white halo. A marigold's orange edge fails the paleness test and is left alone.
 
+## Tweak
+
+Under every result — texture, artwork, cut-out, concept render — there is a
+box. Type a change, press Tweak, get the same image back with only that
+change: *make it more purple*, *remove the shadow*, *add embers drifting up*.
+Everything you did not mention stays. Tweak the tweak to keep going.
+
+It runs on FLUX Kontext dev, an instruction-driven image editor, fetched from
+the Setup tab (about 12 GB, optional). Kontext is an editor, not a painter: it
+was tried as a way to paint whole templates and could not understand the car,
+but "change this one thing about this picture" is exactly the job it is built
+for. A cut-out is flattened onto white for the edit and cut out again after,
+since the editor has no alpha channel. Results are sized back to the original.
+
 ## What was tried and dropped
 
 A **Paint** tab once turned an iRacing paint-kit PSD into a finished sheet:

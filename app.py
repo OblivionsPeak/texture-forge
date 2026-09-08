@@ -177,6 +177,73 @@ def generate():
     return jsonify(payload)
 
 
+@app.route("/api/tweak", methods=["POST"])
+def tweak():
+    """Edit any result in place with FLUX Kontext: 'make it more purple'.
+
+    Works on textures, artwork, decals and concept renders. A decal is flattened
+    onto white for the edit and cut out again afterwards, since Kontext has no
+    alpha. The result is sized back to the original so it drops into the same
+    slot in Clearcoat.
+    """
+    body = request.get_json(force=True) or {}
+    rel = (body.get("file") or "").replace("\\", "/").lstrip("/")
+    src = (OUT / rel).resolve()
+    if not rel or OUT.resolve() not in src.parents or not src.exists():
+        return jsonify({"ok": False, "error": "that result is not in out/"}), 400
+    instruction = (body.get("instruction") or "").strip()
+    if not instruction:
+        return jsonify({"ok": False, "error": "say what to change"}), 400
+    if not comfy.kontext_ready():
+        return jsonify({"ok": False, "error": "The Kontext model is not installed. Fetch it from the Setup tab (about 12 GB)."}), 409
+    if not comfy.is_up():
+        return jsonify({"ok": False, "error": "ComfyUI is not running. Start it first."}), 409
+
+    original = Image.open(src)
+    is_decal = original.mode == "RGBA" and original.getchannel("A").getextrema()[0] < 255
+    work = original.convert("RGB")
+    if is_decal:
+        flat = Image.new("RGB", original.size, (255, 255, 255))
+        flat.paste(original, mask=original.getchannel("A"))
+        work = flat
+    tmp = OUT / f"_tweak_src_{int(time.time())}.png"
+    work.save(tmp)
+
+    seed = int(body.get("seed") or random.randint(1, 2**31 - 1))
+    prompt = instruction
+    if is_decal:
+        prompt += ". Keep the subject isolated on a plain flat white background, no scene, no shadow on the background."
+    else:
+        prompt += ". Keep the composition, framing and everything not mentioned exactly as it is. No text, no watermark, no border."
+    files, err = comfy.edit(tmp, prompt, seed, steps=int(body.get("steps", 20)),
+                            guidance=float(body.get("guidance", 2.5)))
+    tmp.unlink(missing_ok=True)
+    if err:
+        return jsonify({"ok": False, "error": err}), 500
+
+    out = Image.open(files[0]).convert("RGB").resize(original.size, Image.LANCZOS)
+    stem = f"{src.stem}_tweak_{seed}"
+    dest_dir = src.parent
+    if is_decal:
+        cut, removed = post.cutout(out)
+        cut = post.trim_to_subject(cut)
+        name = f"{stem}.png"
+        cut.save(dest_dir / name)
+        rel_out = str((dest_dir / name).relative_to(OUT)).replace("\\", "/")
+        return jsonify({"ok": True, "kind": "decal", "file": rel_out, "url": f"/out/{rel_out}",
+                        "size": cut.size, "cutout": round(removed * 100, 1),
+                        "transparent": True, "seed": seed, "prompt": prompt})
+    name = f"{stem}.png"
+    out.save(dest_dir / name)
+    sq = post.squint(out)
+    sq.save(dest_dir / f"{stem}_squint.png")
+    rel_out = str((dest_dir / name).relative_to(OUT)).replace("\\", "/")
+    rel_sq = rel_out[:-4] + "_squint.png"
+    return jsonify({"ok": True, "kind": "image", "file": rel_out, "url": f"/out/{rel_out}",
+                    "squint_url": f"/out/{rel_sq}", "size": out.size,
+                    "value_range": post.value_range(out), "seed": seed, "prompt": prompt})
+
+
 @app.route("/api/silhouette", methods=["POST"])
 def make_silhouette():
     body = request.get_json(force=True) or {}
