@@ -11,11 +11,13 @@ PY=$(command -v python3 || command -v python) || {
 [ -x .venv/bin/python ] || { echo "First run - creating a private environment..."; "$PY" -m venv .venv; }
 VPY=.venv/bin/python
 
-if [ ! -f .venv/.deps-ok ]; then
+# The marker is a copy of requirements.txt, so a new dependency triggers one
+# reinstall instead of being silently ignored.
+if ! cmp -s requirements.txt .venv/.deps-ok; then
   echo "Installing dependencies..."
   "$VPY" -m pip install --quiet --upgrade pip
   "$VPY" -m pip install --quiet -r requirements.txt
-  touch .venv/.deps-ok
+  cp requirements.txt .venv/.deps-ok
 fi
 
 echo "Starting - Texture Forge will open in your browser."
